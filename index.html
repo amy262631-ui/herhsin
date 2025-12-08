@@ -2270,10 +2270,17 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
             />
           </label>
 
-          {/* 🔴 紅色：最終售價 */}
-          <p className="font-bold text-xl text-red-600">
-            最終售價（含管銷）：{(finalCost + adminFee).toLocaleString()} 元
-          </p>
+ {/* 🔵 1️⃣ 最終成本（含管銷） → 黑色 */}
+    <p className="font-bold text-lg text-black">
+      最終成本（含管銷）：{(finalCost + adminFee).toLocaleString()} 元
+    </p>
+
+    {/* 🔴 2️⃣ 建議售價 → 紅色 */}
+    <p className="font-bold text-xl text-red-600">
+      建議售價：{suggestPrice.toLocaleString()} 元
+    </p>
+
+  </div>
 
           {/* 🟢 綠色：預計利潤 */}
           <p className="font-bold text-lg text-green-600">
