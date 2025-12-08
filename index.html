@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>多工程成本試算統 </title>
+<title>多工程成本試算統計 </title>
 
 <!-- Tailwind CSS -->
 <script src="https://cdn.tailwindcss.com"></script>
@@ -2152,101 +2152,113 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
   }
 
 
-  /*************** UI ***************/
-  return (
-    <div className="p-4 max-w-5xl mx-auto">
-      <h2 className="text-2xl font-bold mb-4">成本總表</h2>
+ /*************** UI ***************/
+return (
+  <div className="p-4 max-w-5xl mx-auto">
+    <h2 className="text-2xl font-bold mb-4">成本總表</h2>
 
-      {/* 圓餅圖 */}
-      <div className="w-full h-80 mb-6">
-        <canvas id="summaryChart"></canvas>
+    {/* 圓餅圖 */}
+    <div className="w-full h-80 mb-6">
+      <canvas id="summaryChart"></canvas>
+    </div>
+
+    {/* 五大成本 + 人工調整 */}
+    <div className="bg-white p-4 rounded shadow mb-4">
+      <h3 className="font-bold text-lg mb-2">五大成本 + 人工調整</h3>
+
+      <div className="grid grid-cols-2 gap-3">
+        <p>材料成本：{fmt(materialSum)}</p>
+        <input type="number" value={manualAdjustDetail.material}
+          onChange={e => updateManualAdjust("material", e.target.value)}
+          className="border p-1 w-full" />
+
+        <p>市購品成本：{fmt(purchaseSum)}</p>
+        <input type="number" value={manualAdjustDetail.purchase}
+          onChange={e => updateManualAdjust("purchase", e.target.value)}
+          className="border p-1 w-full" />
+
+        <p>製作成本：{fmt(fabSum)}</p>
+        <input type="number" value={manualAdjustDetail.fabrication}
+          onChange={e => updateManualAdjust("fabrication", e.target.value)}
+          className="border p-1 w-full" />
+
+        <p>運輸費用：{fmt(transSum)}</p>
+        <input type="number" value={manualAdjustDetail.transport}
+          onChange={e => updateManualAdjust("transport", e.target.value)}
+          className="border p-1 w-full" />
+
+        <p>現場安裝成本：{fmt(installSum)}</p>
+        <input type="number" value={manualAdjustDetail.install}
+          onChange={e => updateManualAdjust("install", e.target.value)}
+          className="border p-1 w-full" />
       </div>
 
-      {/* 五大成本 + 人工調整 */}
-      <div className="bg-white p-4 rounded shadow mb-4">
-        <h3 className="font-bold text-lg mb-2">五大成本 + 人工調整</h3>
+      {/* 小計區 */}
+      <div className="mt-4">
+        <p className="font-bold">人工調整小計：{fmt(manualTotal)}</p>
 
-        <div className="grid grid-cols-2 gap-3">
-          <p>材料成本：{fmt(materialSum)}</p>
-          <input type="number" value={manualAdjustDetail.material}
-            onChange={e => updateManualAdjust("material", e.target.value)}
-            className="border p-1 w-full" />
-
-          <p>市購品成本：{fmt(purchaseSum)}</p>
-          <input type="number" value={manualAdjustDetail.purchase}
-            onChange={e => updateManualAdjust("purchase", e.target.value)}
-            className="border p-1 w-full" />
-
-          <p>製作成本：{fmt(fabSum)}</p>
-          <input type="number" value={manualAdjustDetail.fabrication}
-            onChange={e => updateManualAdjust("fabrication", e.target.value)}
-            className="border p-1 w-full" />
-
-          <p>運輸費用：{fmt(transSum)}</p>
-          <input type="number" value={manualAdjustDetail.transport}
-            onChange={e => updateManualAdjust("transport", e.target.value)}
-            className="border p-1 w-full" />
-
-          <p>現場安裝成本：{fmt(installSum)}</p>
-          <input type="number" value={manualAdjustDetail.install}
-            onChange={e => updateManualAdjust("install", e.target.value)}
-            className="border p-1 w-full" />
-        </div>
-
-        <div className="mt-4">
-          <p className="font-bold">人工調整小計：{fmt(manualTotal)}</p>
-          <p className="font-bold text-lg">最終成本：{fmt(finalCost)}</p>
-        </div>
-      </div>
-
-      {/* 建議售價區塊 */}
-      <div className="bg-white p-4 rounded shadow mb-4">
-        <div className="grid grid-cols-2 gap-2 mt-2">
-          <label>管銷(%)
-            <input
-              type="number"
-              value={adminRate}
-              onChange={(e) => setAdminRate(Number(e.target.value))}
-              className="border p-1 w-full"
-            />
-          </label>
-
-          <p>管銷費：{fmt(adminFee)}</p>
-
-          <label>毛利率(%)
-            <input
-              type="number"
-              value={profitRate}
-              onChange={(e) => setProfitRate(Number(e.target.value))}
-              className="border p-1 w-full"
-            />
-          </label>
-
-          <p className="font-bold text-red-600 text-xl">
-            建議售價：{fmt(suggestPrice)}
-          </p>
-
-          <p className="font-bold text-green-600">
-            預計利潤：{fmt(estimatedProfit)} 元
-          </p>
-        </div>
-      </div>
-
-      {/* 匯出 + 列印 */}
-      <div className="flex gap-3 mt-4">
-        <button onClick={exportExcel}
-          className="bg-green-600 text-white px-4 py-2 rounded shadow">
-          匯出 Excel
-        </button>
-
-        <button onClick={() => window.print()}
-          className="bg-gray-700 text-white px-4 py-2 rounded shadow">
-          列印
-        </button>
+        {/* 🔵 成本合計（原最終成本） */}
+        <p className="font-bold text-lg">
+          成本合計：{fmt(finalCost)}
+        </p>
       </div>
     </div>
-  );
-}
+
+    {/* 管銷、毛利率、建議售價 */}
+    <div className="bg-white p-4 rounded shadow mb-4">
+      <div className="grid grid-cols-2 gap-3 mt-2">
+
+        <label>管銷(%)
+          <input
+            type="number"
+            value={adminRate}
+            onChange={(e) => setAdminRate(Number(e.target.value))}
+            className="border p-1 w-full"
+          />
+        </label>
+
+        <p>管銷費：{fmt(adminFee)}</p>
+
+        {/* 🔴 新增：最終成本含管銷 */}
+        <p className="font-bold text-red-600 text-lg col-span-2">
+          最終成本含管銷：{fmt(finalCost + adminFee)} 元
+        </p>
+
+        <label>毛利率(%)
+          <input
+            type="number"
+            value={profitRate}
+            onChange={(e) => setProfitRate(Number(e.target.value))}
+            className="border p-1 w-full"
+          />
+        </label>
+
+        {/* 建議售價 */}
+        <p className="font-bold text-red-600 text-2xl">
+          建議售價：{fmt(suggestPrice)}
+        </p>
+
+        {/* 🟢 預計利潤搬到建議售價下方 */}
+        <p className="font-bold text-green-600 col-span-2">
+          預計利潤：{fmt(estimatedProfit)} 元
+        </p>
+      </div>
+    </div>
+
+    {/* 匯出 Excel + 列印 */}
+    <div className="flex gap-3 mt-4">
+      <button onClick={exportExcel}
+        className="bg-green-600 text-white px-4 py-2 rounded shadow">
+        匯出 Excel
+      </button>
+
+      <button onClick={() => window.print()}
+        className="bg-gray-700 text-white px-4 py-2 rounded shadow">
+        列印
+      </button>
+    </div>
+  </div>
+);
 /****************************************************
  * PART X — 工程一鍵備份 & 匯入功能
  ****************************************************/
