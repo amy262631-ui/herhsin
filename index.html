@@ -2244,48 +2244,49 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
         </div>
       </div>
 
-      {/* 管銷、毛利率、建議售價、利潤 */}
-      <div className="bg-white p-4 rounded shadow mb-4">
-        <div className="grid grid-cols-2 gap-2 mt-2">
+      {/* 管銷、毛利率、建議售價 */}
+<div className="bg-white p-4 rounded shadow mb-4">
+  <div className="grid grid-cols-2 gap-2 mt-2">
 
-          <label>
-            管銷(%)
-            <input
-              type="number"
-              value={adminRate}
-              onChange={(e) => setAdminRate(Number(e.target.value))}
-              className="border p-1 w-full"
-            />
-          </label>
+    <label>管銷(%)
+      <input
+        type="number"
+        value={adminRate}
+        onChange={(e) => setAdminRate(Number(e.target.value))}
+        className="border p-1 w-full"
+      />
+    </label>
 
-          <p>管銷費：{adminFee.toLocaleString()}</p>
+    <p>管銷費：{adminFee.toLocaleString()} 元</p>
 
-          <label>
-            毛利率(%)
-            <input
-              type="number"
-              value={profitRate}
-              onChange={(e) => setProfitRate(Number(e.target.value))}
-              className="border p-1 w-full"
-            />
-          </label>
+    <label>毛利率(%)
+      <input
+        type="number"
+        value={profitRate}
+        onChange={(e) => setProfitRate(Number(e.target.value))}
+        className="border p-1 w-full"
+      />
+    </label>
 
- {/* 🔵 1️⃣ 最終成本（含管銷） → 黑色 */}
+    {/* 1️⃣ 最終成本（含管銷） → 黑色 */}
     <p className="font-bold text-lg text-black">
       最終成本（含管銷）：{(finalCost + adminFee).toLocaleString()} 元
     </p>
 
-    {/* 🔴 2️⃣ 建議售價 → 紅色 */}
+    {/* 2️⃣ 建議售價 → 紅色 */}
     <p className="font-bold text-xl text-red-600">
       建議售價：{suggestPrice.toLocaleString()} 元
     </p>
 
-          {/* 🟢 綠色：預計利潤 */}
-          <p className="font-bold text-lg text-green-600">
-            預計利潤：{profitAmount.toLocaleString()} 元
-          </p>
-        </div>
-      </div>
+  </div>
+
+  {/* 預計利潤 */}
+  <div className="mt-3">
+    <p className="font-bold text-green-600 text-lg">
+      預計利潤：{(suggestPrice - (finalCost + adminFee)).toLocaleString()} 元
+    </p>
+  </div>
+</div>
 
       {/* 匯出 Excel + 列印 */}
       <div className="flex gap-3 print-hidden mt-4">
