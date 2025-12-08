@@ -1907,13 +1907,12 @@ function InstallPage({ installDB, projectData, setProjectData }) {
  * PART 9 — SummaryPage（總表）
  ****************************************************/
 function SummaryPage({ projectData, currentProject, updateProjectData }) {
-
   const chartRef = React.useRef(null);
 
-  /* 五大類成本小計 */
-  const sumByType = type =>
+  /*************** 五大類成本小計 ***************/
+  const sumByType = (type) =>
     projectData.allItems
-      .filter(i => i.type === type)
+      .filter((i) => i.type === type)
       .reduce((a, b) => a + (b.subtotal || 0), 0);
 
   const materialSum = sumByType("材料");
@@ -1924,13 +1923,13 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
 
   const fiveTotal = materialSum + purchaseSum + fabSum + transSum + installSum;
 
-  /* 人工調整 */
+  /*************** 人工調整欄位 ***************/
   const manualAdjustDetail = projectData.manualAdjustDetail || {
     material: 0,
     purchase: 0,
     fabrication: 0,
     transport: 0,
-    install: 0
+    install: 0,
   };
 
   const manualTotal = Object.values(manualAdjustDetail).reduce(
@@ -1938,37 +1937,31 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
     0
   );
 
-  /* 成本合計（原：最終成本） */
-  const finalCost = fiveTotal + manualTotal;
+  const finalCost = fiveTotal + manualTotal; // 成本合計
 
-  /* 管銷、毛利、售價 */
+  /*************** 管銷 / 毛利 / 售價 ***************/
   const [adminRate, setAdminRate] = React.useState(15);
   const [profitRate, setProfitRate] = React.useState(35);
 
   const adminFee = Math.round(finalCost * (adminRate / 100));
-
   const suggestPrice = Math.round(
     (finalCost + adminFee) / (1 - profitRate / 100)
   );
 
-  /* 預計利潤 */
-  const estimatedProfit = suggestPrice - (finalCost + adminFee);
+  const profitAmount = suggestPrice - finalCost - adminFee; // 利潤額 (綠色框)
 
-  /* 千分位格式 */
-  const fmt = (n) => Number(n || 0).toLocaleString("en-US");
-
-  /* 更新人工調整 */
+  /*************** 更新人工調整 ***************/
   function updateManualAdjust(field, value) {
     const num = value === "" ? "" : Number(value);
 
     const newDetail = {
       ...manualAdjustDetail,
-      [field]: num
+      [field]: num,
     };
 
     updateProjectData({
       ...projectData,
-      manualAdjustDetail: newDetail
+      manualAdjustDetail: newDetail,
     });
   }
 
@@ -1991,9 +1984,15 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
         datasets: [
           {
             data,
-            backgroundColor: ["#4fa3d1", "#ffcc66", "#66cc99", "#ff6666", "#9999ff"]
-          }
-        ]
+            backgroundColor: [
+              "#4fa3d1",
+              "#ffcc66",
+              "#66cc99",
+              "#ff6666",
+              "#9999ff",
+            ],
+          },
+        ],
       },
       options: {
         responsive: true,
@@ -2005,21 +2004,164 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
             font: { weight: "bold", size: 16 },
             formatter: (value) => {
               const total = data.reduce((a, b) => a + b, 0);
-              return total === 0 ? "0%" : ((value / total) * 100).toFixed(1) + "%";
-            }
-          }
-        }
+              return total === 0
+                ? "0%"
+                : ((value / total) * 100).toFixed(1) + "%";
+            },
+          },
+        },
       },
-      plugins: [ChartDataLabels]
+      plugins: [ChartDataLabels],
     });
   }, [materialSum, purchaseSum, fabSum, transSum, installSum]);
 
-  /*************** 匯出 Excel ***************/
+  /****************************************************
+   * 匯出 Excel（含設備名稱 equipment）
+   ****************************************************/
   function exportExcel() {
-    //（你的 Excel 原程式碼保留即可）
+    const wb = XLSX.utils.book_new();
+
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+
+    const projectName = currentProject || "未命名工程";
+    const fileName = `${yyyy}${mm}${dd}-${projectName}-成本分析.xlsx`;
+
+    const rows = [];
+
+    /************************************
+     * 材料
+     ************************************/
+    rows.push(["材料成本明細表"]);
+    rows.push(["設備名稱", "分類", "規格", "長m", "寬m", "數量", "重量", "單價", "小計"]);
+
+    projectData.allItems
+      .filter((i) => i.type === "材料")
+      .forEach((i) =>
+        rows.push([
+          i.equipment || "",
+          i.category,
+          i.spec,
+          i.length || "",
+          i.width || "",
+          i.pcs,
+          i.weight || "",
+          i.price,
+          i.subtotal,
+        ])
+      );
+    rows.push(["合計", "", "", "", "", "", "", "", materialSum]);
+    rows.push([]);
+
+    /************************************
+     * 市購品
+     ************************************/
+    rows.push(["市購品成本明細表"]);
+    rows.push(["設備名稱", "分類", "品項", "數量", "單價", "小計"]);
+
+    projectData.allItems
+      .filter((i) => i.type === "市購品")
+      .forEach((i) =>
+        rows.push([
+          i.equipment || "",
+          i.category,
+          i.spec,
+          i.qty,
+          i.price,
+          i.subtotal,
+        ])
+      );
+    rows.push(["合計", "", "", "", "", purchaseSum]);
+    rows.push([]);
+
+    /************************************
+     * 製作
+     ************************************/
+    rows.push(["製作成本明細表"]);
+    rows.push(["設備名稱", "分類", "項目", "數量", "單價", "小計"]);
+
+    projectData.allItems
+      .filter((i) => i.type === "製作成本")
+      .forEach((i) =>
+        rows.push([
+          i.equipment || "",
+          i.category,
+          i.spec,
+          i.qty,
+          i.price,
+          i.subtotal,
+        ])
+      );
+    rows.push(["合計", "", "", "", "", fabSum]);
+    rows.push([]);
+
+    /************************************
+     * 運輸
+     ************************************/
+    rows.push(["運輸成本明細表"]);
+    rows.push(["設備名稱", "分類", "項目", "地區", "數量", "單價", "小計"]);
+
+    projectData.allItems
+      .filter((i) => i.type === "運輸費用")
+      .forEach((i) =>
+        rows.push([
+          i.equipment || "",
+          i.category,
+          i.spec,
+          i.region,
+          i.qty,
+          i.price,
+          i.subtotal,
+        ])
+      );
+    rows.push(["合計", "", "", "", "", "", transSum]);
+    rows.push([]);
+
+    /************************************
+     * 現場安裝
+     ************************************/
+    rows.push(["現場安裝成本明細表"]);
+    rows.push(["設備名稱", "分類", "規格", "數量", "單價", "小計"]);
+
+    projectData.allItems
+      .filter((i) => i.type === "現場安裝")
+      .forEach((i) =>
+        rows.push([
+          i.equipment || "",
+          i.category,
+          i.spec,
+          i.qty,
+          i.price,
+          i.subtotal,
+        ])
+      );
+    rows.push(["合計", "", "", "", "", installSum]);
+    rows.push([]);
+
+    /************************************
+     * 成本總表
+     ************************************/
+    rows.push(["", "項目", "金額"]);
+    rows.push(["", "五大成本合計", fiveTotal]);
+    rows.push(["", "人工調整合計", manualTotal]);
+    rows.push(["", "成本合計", finalCost]);
+    rows.push(["", "管銷率(%)", adminRate]);
+    rows.push(["", "管銷費", adminFee]);
+    rows.push(["", "毛利率(%)", profitRate]);
+    rows.push(["", "建議售價", suggestPrice]);
+    rows.push(["", "預計利潤", profitAmount]);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, "成本分析");
+
+    XLSX.writeFile(wb, fileName);
   }
 
-  /*************** UI ***************/
+  /****************************************************
+   * RETURN UI（含你要求的紅色售價 + 成本合計 + 綠色利潤）
+   ****************************************************/
   return (
     <div className="p-4 max-w-5xl mx-auto">
       <h2 className="text-2xl font-bold mb-4">成本總表</h2>
@@ -2034,59 +2176,80 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
         <h3 className="font-bold text-lg mb-2">五大成本 + 人工調整</h3>
 
         <div className="grid grid-cols-2 gap-3">
+          <div><p>材料成本：{materialSum.toLocaleString()}</p></div>
+          <div>
+            <label>人工調整：
+              <input
+                type="number"
+                value={manualAdjustDetail.material}
+                onChange={(e) => updateManualAdjust("material", e.target.value)}
+                className="border p-1 w-full"
+              />
+            </label>
+          </div>
 
-          <p>材料成本：{fmt(materialSum)}</p>
-          <input type="number"
-            value={manualAdjustDetail.material}
-            onChange={e => updateManualAdjust("material", e.target.value)}
-            className="border p-1 w-full"
-          />
+          <div><p>市購品成本：{purchaseSum.toLocaleString()}</p></div>
+          <div>
+            <label>人工調整：
+              <input
+                type="number"
+                value={manualAdjustDetail.purchase}
+                onChange={(e) => updateManualAdjust("purchase", e.target.value)}
+                className="border p-1 w-full"
+              />
+            </label>
+          </div>
 
-          <p>市購品成本：{fmt(purchaseSum)}</p>
-          <input type="number"
-            value={manualAdjustDetail.purchase}
-            onChange={e => updateManualAdjust("purchase", e.target.value)}
-            className="border p-1 w-full"
-          />
+          <div><p>製作成本：{fabSum.toLocaleString()}</p></div>
+          <div>
+            <label>人工調整：
+              <input
+                type="number"
+                value={manualAdjustDetail.fabrication}
+                onChange={(e) => updateManualAdjust("fabrication", e.target.value)}
+                className="border p-1 w-full"
+              />
+            </label>
+          </div>
 
-          <p>製作成本：{fmt(fabSum)}</p>
-          <input type="number"
-            value={manualAdjustDetail.fabrication}
-            onChange={e => updateManualAdjust("fabrication", e.target.value)}
-            className="border p-1 w-full"
-          />
+          <div><p>運輸費用：{transSum.toLocaleString()}</p></div>
+          <div>
+            <label>人工調整：
+              <input
+                type="number"
+                value={manualAdjustDetail.transport}
+                onChange={(e) => updateManualAdjust("transport", e.target.value)}
+                className="border p-1 w-full"
+              />
+            </label>
+          </div>
 
-          <p>運輸費用：{fmt(transSum)}</p>
-          <input type="number"
-            value={manualAdjustDetail.transport}
-            onChange={e => updateManualAdjust("transport", e.target.value)}
-            className="border p-1 w-full"
-          />
-
-          <p>現場安裝成本：{fmt(installSum)}</p>
-          <input type="number"
-            value={manualAdjustDetail.install}
-            onChange={e => updateManualAdjust("install", e.target.value)}
-            className="border p-1 w-full"
-          />
+          <div><p>現場安裝成本：{installSum.toLocaleString()}</p></div>
+          <div>
+            <label>人工調整：
+              <input
+                type="number"
+                value={manualAdjustDetail.install}
+                onChange={(e) => updateManualAdjust("install", e.target.value)}
+                className="border p-1 w-full"
+              />
+            </label>
+          </div>
         </div>
 
-        {/* 小計區 */}
+        {/* 小計 */}
         <div className="mt-4">
-          <p className="font-bold">人工調整小計：{fmt(manualTotal)}</p>
-
-          {/* 成本合計（取代最終成本） */}
-          <p className="font-bold text-lg">
-            成本合計：{fmt(finalCost)} 元
-          </p>
+          <p className="font-bold">人工調整小計：{manualTotal.toLocaleString()}</p>
+          <p className="font-bold text-lg">成本合計：{finalCost.toLocaleString()}</p>
         </div>
       </div>
 
-      {/* 管銷、毛利、售價 */}
+      {/* 管銷、毛利率、建議售價、利潤 */}
       <div className="bg-white p-4 rounded shadow mb-4">
-        <div className="grid grid-cols-2 gap-3 mt-2">
+        <div className="grid grid-cols-2 gap-2 mt-2">
 
-          <label>管銷(%)
+          <label>
+            管銷(%)
             <input
               type="number"
               value={adminRate}
@@ -2095,14 +2258,10 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
             />
           </label>
 
-          <p>管銷費：{fmt(adminFee)}</p>
+          <p>管銷費：{adminFee.toLocaleString()}</p>
 
-          {/* 最終成本含管銷 */}
-          <p className="font-bold text-red-600 text-lg col-span-2">
-            最終成本含管銷：{fmt(finalCost + adminFee)} 元
-          </p>
-
-          <label>毛利率(%)
+          <label>
+            毛利率(%)
             <input
               type="number"
               value={profitRate}
@@ -2111,111 +2270,37 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
             />
           </label>
 
-          {/* 建議售價 */}
-          <p className="font-bold text-red-600 text-2xl">
-            建議售價：{fmt(suggestPrice)} 元
+          {/* 🔴 紅色：最終售價 */}
+          <p className="font-bold text-xl text-red-600">
+            最終售價（含管銷）：{(finalCost + adminFee).toLocaleString()} 元
           </p>
 
-          {/* 預計利潤 */}
-          <p className="font-bold text-green-600 col-span-2">
-            預計利潤：{fmt(estimatedProfit)} 元
+          {/* 🟢 綠色：預計利潤 */}
+          <p className="font-bold text-lg text-green-600">
+            預計利潤：{profitAmount.toLocaleString()} 元
           </p>
         </div>
       </div>
 
       {/* 匯出 Excel + 列印 */}
-      <div className="flex gap-3 mt-4">
-        <button onClick={exportExcel}
-          className="bg-green-600 text-white px-4 py-2 rounded shadow">
+      <div className="flex gap-3 print-hidden mt-4">
+        <button
+          onClick={exportExcel}
+          className="bg-green-600 text-white px-4 py-2 rounded shadow"
+        >
           匯出 Excel
         </button>
 
-        <button onClick={() => window.print()}
-          className="bg-gray-700 text-white px-4 py-2 rounded shadow">
+        <button
+          onClick={() => window.print()}
+          className="bg-gray-700 text-white px-4 py-2 rounded shadow"
+        >
           列印
         </button>
       </div>
     </div>
   );
 }
-/****************************************************
- * PART X — 工程一鍵備份 & 匯入功能
- ****************************************************/
-function BackupRestore({ projects, setProjects, setCurrentProject }) {
-
-  /** 匯出 JSON **/
-  function exportBackup() {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(projects, null, 2));
-    const fileName = `工程備份-${new Date().toISOString().slice(0,10)}.json`;
-
-    const a = document.createElement("a");
-    a.href = dataStr;
-    a.download = fileName;
-    a.click();
-  }
-
-  /** 匯入 JSON **/
-  function importBackup(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-
-    reader.onload = function(evt) {
-      try {
-        const imported = JSON.parse(evt.target.result);
-
-        if (typeof imported !== "object") {
-          alert("匯入格式錯誤");
-          return;
-        }
-
-        // merge
-        const merged = { ...projects, ...imported };
-
-        localStorage.setItem("projects_v3", JSON.stringify(merged));
-        setProjects(merged);
-
-        // 若匯入後無現行工程 → 自動選第一個
-        const firstKey = Object.keys(merged)[0] || "";
-        setCurrentProject(firstKey);
-
-        alert("匯入成功！");
-      } catch (err) {
-        alert("匯入失敗：JSON 格式錯誤");
-      }
-    };
-
-    reader.readAsText(file);
-  }
-
-  return (
-    <div className="bg-white p-4 rounded shadow mb-4 print-hidden">
-      <h3 className="font-bold text-lg mb-2">工程備份 / 還原</h3>
-
-      <div className="flex gap-3 items-center">
-        
-        <button
-          onClick={exportBackup}
-          className="bg-purple-600 text-white px-4 py-2 rounded shadow"
-        >
-          📤 匯出全部工程備份
-        </button>
-
-        <label className="bg-blue-600 text-white px-4 py-2 rounded shadow cursor-pointer">
-          📥 匯入工程備份
-          <input
-            type="file"
-            accept="application/json"
-            className="hidden"
-            onChange={importBackup}
-          />
-        </label>
-
-      </div>
-    </div>
-  );
-}    
 /****************************************************
  * PART 10 — App（主控制）
  * - 多工程管理
