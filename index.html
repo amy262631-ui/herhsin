@@ -634,49 +634,47 @@ function MaterialsPage({ materialDB, projectData, setProjectData }) {
   );
 }
 /****************************************************
- * PART 5 — PurchasePage（市購品）
- * - 支援設備名稱
- * - 可新增、刪除
- * - 可編輯（規格、數量、單價）
+ * PART X — PurchasePage（市購品）
+ * 含設備名稱、分類/品項下拉、新增、編輯、刪除
  ****************************************************/
 function PurchasePage({ purchaseDB, projectData, setProjectData }) {
+
+  /* ------------------ 新增欄位 ------------------ */
+  const [equipName, setEquipName] = React.useState("");
   const [category, setCategory] = React.useState("");
   const [spec, setSpec] = React.useState("");
   const [qty, setQty] = React.useState("");
-  const [equip, setEquip] = React.useState("");
 
-  /* 取得分類列表 */
+  /* ------------------ 下拉選單 ------------------ */
   const categories = React.useMemo(() => {
     const s = new Set();
     purchaseDB.forEach(r => s.add(r.category));
     return [...s];
   }, [purchaseDB]);
 
-  /* 取得規格列表 */
   const specs = React.useMemo(() => {
     return purchaseDB
       .filter(r => r.category === category)
       .map(r => r.spec);
   }, [category, purchaseDB]);
 
-  /* 找到 DB row */
   const selectedRow = React.useMemo(() => {
     return purchaseDB.find(r => r.category === category && r.spec === spec);
-  }, [category, spec, purchaseDB]);
+  }, [category, spec]);
 
   const price = selectedRow ? Number(selectedRow.price) : 0;
   const subtotal = price * Number(qty || 0);
 
-  /**************** 新增 ****************/
+  /* ------------------ 新增明細 ------------------ */
   function addToList() {
     if (!category || !spec || !qty) {
-      alert("請完整輸入");
+      alert("請完整輸入！");
       return;
     }
 
     const item = {
       type: "市購品",
-      equipment: equip || "",
+      equipment: equipName || "",
       category,
       spec,
       qty: Number(qty),
@@ -684,61 +682,37 @@ function PurchasePage({ purchaseDB, projectData, setProjectData }) {
       subtotal
     };
 
-    setProjectData({
+    const updated = {
       ...projectData,
       allItems: [...projectData.allItems, item]
-    });
+    };
 
-    setEquip("");
+    setProjectData(updated);
+
     setSpec("");
     setQty("");
   }
 
-  /**************** 列表 ****************/
+  /* ------------------ 明細列表 ------------------ */
   const items = projectData.allItems.filter(i => i.type === "市購品");
 
-  /**************** 刪除 ****************/
-  function deleteItem(idx) {
-    if (!confirm("確定刪除？")) return;
-
-    const target = items[idx];
-    const newAll = projectData.allItems.filter(i => i !== target);
-    setProjectData({ ...projectData, allItems: newAll });
-  }
-
-  /**************** 編輯模式 ****************/
+  /* ------------------ 編輯功能 ------------------ */
   const [editIndex, setEditIndex] = React.useState(null);
   const [editItem, setEditItem] = React.useState(null);
 
   function startEdit(idx) {
     const item = items[idx];
-    const row = purchaseDB.find(r => r.category === item.category);
 
-    setEditIndex(idx);
+    const specs = purchaseDB
+      .filter(r => r.category === item.category)
+      .map(r => r.spec);
+
     setEditItem({
       ...item,
-      specs: purchaseDB.filter(r => r.category === item.category).map(r => r.spec)
+      specs
     });
-  }
 
-  function saveEdit(idx) {
-    const source = items[idx];
-
-    const updatedItem = {
-      ...source,
-      equipment: editItem.equipment,
-      spec: editItem.spec,
-      qty: Number(editItem.qty),
-      price: Number(editItem.price),
-      subtotal: Number(editItem.qty) * Number(editItem.price)
-    };
-
-    const newAll = [...projectData.allItems];
-    newAll[projectData.allItems.indexOf(source)] = updatedItem;
-
-    setProjectData({ ...projectData, allItems: newAll });
-    setEditIndex(null);
-    setEditItem(null);
+    setEditIndex(idx);
   }
 
   function cancelEdit() {
@@ -746,7 +720,35 @@ function PurchasePage({ purchaseDB, projectData, setProjectData }) {
     setEditItem(null);
   }
 
-  /**************** UI 渲染 ****************/
+  function saveEdit(idx) {
+    const old = items[idx];
+
+    const updated = {
+      ...old,
+      equipment: editItem.equipment,
+      spec: editItem.spec,
+      qty: Number(editItem.qty),
+      price: Number(editItem.price),
+      subtotal: Number(editItem.qty) * Number(editItem.price)
+    };
+
+    const all = [...projectData.allItems];
+    all[projectData.allItems.indexOf(old)] = updated;
+
+    setProjectData({ ...projectData, allItems: all });
+    setEditIndex(null);
+  }
+
+  /* ------------------ 刪除 ------------------ */
+  function deleteItem(idx) {
+    if (!confirm("確定刪除？")) return;
+    const target = items[idx];
+
+    const updated = projectData.allItems.filter(i => i !== target);
+    setProjectData({ ...projectData, allItems: updated });
+  }
+
+  /* ------------------ Render ------------------ */
   return (
     <div className="p-4 bg-white rounded shadow">
 
@@ -757,9 +759,9 @@ function PurchasePage({ purchaseDB, projectData, setProjectData }) {
         <label className="font-bold">設備名稱：</label>
         <input
           type="text"
-          value={equip}
-          onChange={e => setEquip(e.target.value)}
-          className="border px-2 py-1 rounded ml-2 w-48"
+          value={equipName}
+          onChange={e => setEquipName(e.target.value)}
+          className="border px-2 py-1 ml-2 rounded w-48"
           placeholder="可留白"
         />
       </div>
@@ -770,57 +772,63 @@ function PurchasePage({ purchaseDB, projectData, setProjectData }) {
         <select
           value={category}
           onChange={e => { setCategory(e.target.value); setSpec(""); }}
-          className="border px-2 py-1 rounded ml-2"
+          className="border px-2 py-1 ml-2 rounded"
         >
           <option value="">請選擇分類</option>
-          {categories.map(c => (
-            <option key={c}>{c}</option>
-          ))}
+          {categories.map(c => <option key={c}>{c}</option>)}
         </select>
       </div>
 
-      {/* 規格 */}
+      {/* 品項 */}
       {category && (
         <div className="mb-3">
           <label className="font-bold">品項：</label>
           <select
             value={spec}
             onChange={e => setSpec(e.target.value)}
-            className="border px-2 py-1 rounded ml-2"
+            className="border px-2 py-1 ml-2 rounded"
           >
             <option value="">請選擇品項</option>
-            {specs.map(s => (
-              <option key={s}>{s}</option>
-            ))}
+            {specs.map(s => <option key={s}>{s}</option>)}
           </select>
         </div>
       )}
 
-      {/* 數量 / 單價 */}
+      {/* 單價 */}
       {selectedRow && (
-        <>
-          <div className="mb-3">
-            <label className="font-bold">數量：</label>
-            <input
-              type="number"
-              value={qty}
-              onChange={e => setQty(e.target.value)}
-              className="border px-2 py-1 rounded ml-2 w-32"
-            />
-          </div>
-
-          <div className="p-3 bg-gray-50 border rounded mb-4">
-            單價：{price} 元 ／ 小計：<b>{subtotal.toLocaleString()}</b> 元
-          </div>
-
-          <button
-            onClick={addToList}
-            className="px-4 py-2 bg-blue-600 text-white rounded font-bold"
-          >
-            ＋ 加入成本明細表
-          </button>
-        </>
+        <div className="p-3 bg-gray-50 border rounded mb-3">
+          <p>單位：{selectedRow.unit}</p>
+          <p>單價：<b>{price}</b> 元</p>
+        </div>
       )}
+
+      {/* 數量 */}
+      {selectedRow && (
+        <div className="mb-3">
+          <label className="font-bold">數量：</label>
+          <input
+            type="number"
+            value={qty}
+            onChange={e => setQty(e.target.value)}
+            className="border px-2 py-1 ml-2 rounded w-32"
+          />
+        </div>
+      )}
+
+      {/* 小計 */}
+      {selectedRow && (
+        <div className="p-3 bg-gray-50 border rounded mb-4">
+          小計：<b>{subtotal.toLocaleString()}</b> 元
+        </div>
+      )}
+
+      {/* 新增按鈕 */}
+      <button
+        onClick={addToList}
+        className="px-4 py-2 bg-blue-600 text-white rounded font-bold"
+      >
+        ＋ 加入成本明細表
+      </button>
 
       {/* 明細表 */}
       <h3 className="text-lg font-bold mt-6 mb-2">市購品明細</h3>
@@ -834,13 +842,13 @@ function PurchasePage({ purchaseDB, projectData, setProjectData }) {
             <th className="border px-2 py-1">數量</th>
             <th className="border px-2 py-1">單價</th>
             <th className="border px-2 py-1">小計</th>
-            <th className="border px-2 py-1">操作</th>
+            <th className="border px-2 py-1 w-24">操作</th>
           </tr>
         </thead>
 
         <tbody>
           {items.map((i, idx) => {
-            const isEdit = idx === editIndex;
+            const isEdit = editIndex === idx;
 
             if (!isEdit) {
               return (
@@ -851,8 +859,7 @@ function PurchasePage({ purchaseDB, projectData, setProjectData }) {
                   <td className="border px-2 py-1">{i.qty}</td>
                   <td className="border px-2 py-1">{i.price}</td>
                   <td className="border px-2 py-1">{i.subtotal.toLocaleString()}</td>
-
-                  <td className="border px-2 py-1 space-x-2">
+                  <td className="border px-2 py-1 text-center space-x-2">
                     <button
                       onClick={() => startEdit(idx)}
                       className="text-blue-600 font-bold"
@@ -875,6 +882,7 @@ function PurchasePage({ purchaseDB, projectData, setProjectData }) {
               <tr key={idx} className="bg-yellow-50">
                 <td className="border px-2 py-1">
                   <input
+                    type="text"
                     value={editItem.equipment}
                     onChange={e => setEditItem({ ...editItem, equipment: e.target.value })}
                     className="border p-1 w-full"
@@ -886,12 +894,19 @@ function PurchasePage({ purchaseDB, projectData, setProjectData }) {
                 <td className="border px-2 py-1">
                   <select
                     value={editItem.spec}
-                    onChange={e => setEditItem({ ...editItem, spec: e.target.value })}
-                    className="border p-1"
+                    onChange={e => {
+                      const row = purchaseDB.find(
+                        r => r.category === i.category && r.spec === e.target.value
+                      );
+                      setEditItem({
+                        ...editItem,
+                        spec: e.target.value,
+                        price: row ? Number(row.price) : editItem.price
+                      });
+                    }}
+                    className="border px-1 py-1 rounded"
                   >
-                    {editItem.specs.map(s => (
-                      <option key={s}>{s}</option>
-                    ))}
+                    {editItem.specs.map(s => <option key={s}>{s}</option>)}
                   </select>
                 </td>
 
@@ -917,7 +932,7 @@ function PurchasePage({ purchaseDB, projectData, setProjectData }) {
                   {(Number(editItem.qty) * Number(editItem.price)).toLocaleString()}
                 </td>
 
-                <td className="border px-2 py-1 space-x-2">
+                <td className="border px-2 py-1 text-center space-x-2">
                   <button
                     onClick={() => saveEdit(idx)}
                     className="text-green-600 font-bold"
@@ -933,6 +948,7 @@ function PurchasePage({ purchaseDB, projectData, setProjectData }) {
                 </td>
               </tr>
             );
+
           })}
         </tbody>
       </table>
