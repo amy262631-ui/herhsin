@@ -942,9 +942,9 @@ function PurchasePage({ purchaseDB, projectData, setProjectData }) {
 }
 /****************************************************
  * PART 6 — FabricationPage（製作成本）
- * + 新增：設備名稱 editable 欄位
+ * ✔ 完整乾淨版（無 validateDOMNesting 錯誤）
+ * ✔ 設備名稱可輸入
  ****************************************************/
-
 function FabricationPage({ fabricationDB, projectData, setProjectData }) {
   const [category, setCategory] = React.useState("");
   const [spec, setSpec] = React.useState("");
@@ -972,7 +972,7 @@ function FabricationPage({ fabricationDB, projectData, setProjectData }) {
   const unitPrice = selectedRow ? Number(selectedRow.price) : 0;
   const subtotal = Math.round(unitPrice * Number(qty || 0));
 
-  /*************** 新增明細 ***************/
+  /**************** 新增製作成本 ****************/
   function addToList() {
     if (!category || !spec) {
       alert("請選擇分類與項目");
@@ -990,7 +990,7 @@ function FabricationPage({ fabricationDB, projectData, setProjectData }) {
       qty: Number(qty),
       price: unitPrice,
       subtotal,
-      equipment: ""   // ★ 新增設備名稱欄位
+      equipment: "" // 設備名稱欄位
     };
 
     setProjectData({
@@ -1002,7 +1002,7 @@ function FabricationPage({ fabricationDB, projectData, setProjectData }) {
     setQty("");
   }
 
-  /*************** 更新設備名稱 ***************/
+  /**************** 設備名稱更新 ****************/
   function updateEquipment(editIdx, value) {
     const items = projectData.allItems.filter(i => i.type === "製作成本");
 
@@ -1027,12 +1027,11 @@ function FabricationPage({ fabricationDB, projectData, setProjectData }) {
     setProjectData({ ...projectData, allItems: arr });
   }
 
-  /*************** 抓清單 ***************/
   const items = projectData.allItems.filter(i => i.type === "製作成本");
 
+  /**************** Render UI ****************/
   return (
     <div className="p-4 bg-white rounded shadow">
-
       <h2 className="text-xl font-bold mb-4">製作成本</h2>
 
       {/* 分類 */}
@@ -1041,7 +1040,7 @@ function FabricationPage({ fabricationDB, projectData, setProjectData }) {
         <select
           value={category}
           onChange={e => { setCategory(e.target.value); setSpec(""); }}
-          className="border px-2 py-1 rounded ml-2"
+          className="border px-2 py-1 ml-2 rounded"
         >
           <option value="">請選擇分類</option>
           {categories.map(c => <option key={c}>{c}</option>)}
@@ -1055,7 +1054,7 @@ function FabricationPage({ fabricationDB, projectData, setProjectData }) {
           <select
             value={spec}
             onChange={e => setSpec(e.target.value)}
-            className="border px-2 py-1 rounded ml-2"
+            className="border px-2 py-1 ml-2 rounded"
           >
             <option value="">請選擇項目</option>
             {specs.map(s => <option key={s}>{s}</option>)}
@@ -1063,7 +1062,7 @@ function FabricationPage({ fabricationDB, projectData, setProjectData }) {
         </div>
       )}
 
-      {/* 單價 */}
+      {/* 單價顯示 */}
       {selectedRow && (
         <div className="p-3 bg-gray-50 border rounded mb-3">
           <div>單位：{selectedRow.unit}</div>
@@ -1099,13 +1098,13 @@ function FabricationPage({ fabricationDB, projectData, setProjectData }) {
         ＋ 加入成本明細表
       </button>
 
-      {/* 明細 */}
+      {/* ----------- 明細列表 ----------- */}
       <h3 className="text-lg font-bold mt-6 mb-2">製作成本明細</h3>
 
       <table className="w-full border mb-4">
         <thead className="bg-gray-100">
           <tr>
-            <th className="border px-2 py-1">設備名稱</th> {/* ★ 新欄位 */}
+            <th className="border px-2 py-1">設備名稱</th>
             <th className="border px-2 py-1">分類</th>
             <th className="border px-2 py-1">項目</th>
             <th className="border px-2 py-1">數量</th>
@@ -1114,28 +1113,25 @@ function FabricationPage({ fabricationDB, projectData, setProjectData }) {
           </tr>
         </thead>
 
-<tbody>
-  {items.map((i, idx) => (
-    <tr key={idx}>
-      <td className="border px-2 py-1">
-        {/* 設備名稱（可輸入） */}
-        <input
-          value={i.equipment || ""}
-          onChange={e => updateEquipment(idx, e.target.value)}
-          className="border p-1 w-full"
-        />
-      </td>
-
-      <td className="border px-2 py-1">{i.category}</td>
-      <td className="border px-2 py-1">{i.spec}</td>
-      <td className="border px-2 py-1">{i.qty}</td>
-      <td className="border px-2 py-1">{i.price.toLocaleString()}</td>
-      <td className="border px-2 py-1">{i.subtotal.toLocaleString()}</td>
-    </tr>
-  ))}
-</tbody>
+        <tbody>
+          {items.map((i, idx) => (
+            <tr key={idx}>
+              <td className="border px-2 py-1">
+                <input
+                  value={i.equipment || ""}
+                  onChange={e => updateEquipment(idx, e.target.value)}
+                  className="border p-1 w-full"
+                />
+              </td>
+              <td className="border px-2 py-1">{i.category}</td>
+              <td className="border px-2 py-1">{i.spec}</td>
+              <td className="border px-2 py-1">{i.qty}</td>
+              <td className="border px-2 py-1">{i.price.toLocaleString()}</td>
+              <td className="border px-2 py-1">{i.subtotal.toLocaleString()}</td>
+            </tr>
+          ))}
+        </tbody>
       </table>
-
     </div>
   );
 }
