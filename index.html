@@ -2308,6 +2308,90 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
   );
 }
 /****************************************************
+ * PART X — BackupArea（簡易版備份 / 匯入）
+ ****************************************************/
+function BackupArea({ projects, setProjects, setCurrentProject }) {
+
+  /* 匯出 JSON 備份 */
+  function exportBackup() {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+
+    const fileName = `${yyyy}-${mm}-${dd}-Herhsin-CostBackup.json`;
+
+    const blob = new Blob([JSON.stringify(projects, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    alert("✅ 已匯出工程備份");
+  }
+
+  /* 匯入 JSON */
+  function importBackup(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const json = JSON.parse(evt.target.result);
+
+        if (typeof json !== "object") {
+          alert("❌ 匯入失敗：格式不正確");
+          return;
+        }
+
+        setProjects(json);
+
+        const first = Object.keys(json)[0] || "";
+        setCurrentProject(first);
+
+        saveProjects(json);
+
+        alert("✅ 匯入成功！工程資料已還原");
+      } catch (err) {
+        alert("❌ 匯入錯誤：不是有效 JSON");
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  return (
+    <div className="p-3 bg-gray-100 border rounded mb-4">
+      <h3 className="font-bold mb-2">工程備份 / 還原</h3>
+
+      <div className="flex gap-3">
+        {/* 匯出 */}
+        <button
+          onClick={exportBackup}
+          className="px-3 py-1 bg-green-600 text-white rounded"
+        >
+          匯出 JSON 備份
+        </button>
+
+        {/* 匯入 */}
+        <label className="px-3 py-1 bg-blue-600 text-white rounded cursor-pointer">
+          匯入 JSON
+          <input
+            type="file"
+            accept="application/json"
+            className="hidden"
+            onChange={importBackup}
+          />
+        </label>
+      </div>
+    </div>
+  );
+}    
+/****************************************************
  * PART 10 — App（主控制）
  * - 多工程管理
  * - Google Sheet 同步
@@ -2456,7 +2540,13 @@ React.useEffect(() => {
         projects={projects}
         setProjects={setProjects}
       />
-      
+
+      {/* 工程備份 / 還原 */}
+<BackupArea
+  projects={projects}
+  setProjects={setProjects}
+  setCurrentProject={setCurrentProject}
+/>
       {/* 分頁功能 */}
       <div className="flex gap-2 mb-4">
         {["材料", "市購品", "製作成本", "運輸費用", "現場安裝", "總表"].map(tab => (
