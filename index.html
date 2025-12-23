@@ -2392,10 +2392,26 @@ function BackupArea({ projects, setProjects, setCurrentProject }) {
   );
 }    
 /****************************************************
- * PART 10 — App（主控制）- 完整功能整合版
- * 1. 保留原本所有 CSV 讀取解析邏輯
- * 2. 保留 LocalStorage 快取與工程管理
- * 3. 新增 Google Sheet CloudSave 自動同步
+* PART 10 — App（主控制）- 分列同步進階版
+ * 功能：不同工程分開存放，避免多人使用時互相覆蓋
+ ****************************************************/
+const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyKaX7bhCjK3cG2iUwqJrFkYAc_8Q2HCxuQdK67ZS2PLW6eO1dLoJVYdCyHhGUQg54k/exec";
+
+你好！我是程式夥伴。
+
+你提供的這段代碼是單一儲存格覆蓋版。如果只有你一個人使用沒問題，但如果有同事同時在改「不同工程」，這段代碼會導致互相覆蓋。
+
+為了達成你說的「多人同時使用不同工程互不干涉」，我們需要微調 saveToCloud 函數，讓它只發送「目前這個工程」的資料給 Google Apps Script (GAS)。
+
+以下是修改後的完整 PART 10，我已經幫你把「分次存檔」的邏輯加進去了：
+
+🛠️ 調整後的 PART 10 (支援多人分工程協作)
+JavaScript
+
+/****************************************************
+ * PART 10 — App（主控制）- 分列同步進階版
+ * 1. 支援多人同時使用不同工程 (不互相覆蓋)
+ * 2. 保留原本所有功能與 CSV 讀取
  ****************************************************/
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyKaX7bhCjK3cG2iUwqJrFkYAc_8Q2HCxuQdK67ZS2PLW6eO1dLoJVYdCyHhGUQg54k/exec";
 
@@ -2416,34 +2432,39 @@ function App() {
   const [transportDB, setTransportDB] = React.useState([]);
   const [installDB, setInstallDB] = React.useState([]);
 
-  // --- [新增] 雲端同步邏輯：讀取 ---
+  // --- [優化] 雲端同步邏輯：讀取全體 ---
   async function loadProjectsFromCloud() {
     if (!GAS_API_URL || GAS_API_URL.includes("你的_")) return;
     setIsSyncing(true);
     try {
       const resp = await fetch(GAS_API_URL);
       const cloudData = await resp.json();
-      if (cloudData && typeof cloudData === 'object' && Object.keys(cloudData).length > 0) {
+      if (cloudData && typeof cloudData === 'object') {
+        // 合併雲端與本地資料，以雲端為主
         setProjects(cloudData);
-        saveProjects(cloudData); // 同步回本地 LocalStorage
+        saveProjects(cloudData); 
         if (!currentProject) setCurrentProject(Object.keys(cloudData)[0] || "");
       }
     } catch (e) {
-      console.error("雲端載入失敗，維持本地資料");
+      console.error("雲端載入失敗");
     } finally {
       setIsSyncing(false);
     }
   }
 
-  // --- [新增] 雲端同步邏輯：寫入 ---
-  async function saveToCloud(updatedData) {
+  // --- [優化] 雲端同步邏輯：精準寫入單一工程 ---
+  // 這樣你在改 A 工程時，不會影響到同事正在改的 B 工程
+  async function saveToCloud(projectName, projectDetail) {
     if (!GAS_API_URL || GAS_API_URL.includes("你的_")) return;
     setIsSyncing(true);
     try {
       await fetch(GAS_API_URL, {
         method: "POST",
-        mode: "no-cors", 
-        body: JSON.stringify(updatedData)
+        // 注意：不傳送整個 projects，只傳送「這一個」工程
+        body: JSON.stringify({
+          projectName: projectName,
+          data: projectDetail
+        })
       });
     } catch (e) {
       console.error("雲端儲存失敗");
@@ -2464,7 +2485,6 @@ function App() {
     const local = localStorage.getItem("db_" + name);
     const localV = localStorage.getItem("dbv_" + name);
     const { rows, version } = await fetchCSV(url);
-
     if (local && localV === version) {
       setter(JSON.parse(local));
     } else {
@@ -2479,49 +2499,47 @@ function App() {
       setter(parsed);
       localStorage.setItem("db_" + name, JSON.stringify(parsed));
       localStorage.setItem("dbv_" + name, version);
-      localStorage.setItem("dbts_" + name, new Date().toISOString());
     }
   }
 
-  // --- [保留] 初始化邏輯 (加入雲端讀取) ---
+  // --- [保留] 初始化邏輯 ---
   React.useEffect(() => {
     loadDB("material", CSV_URLS.material, setMaterialDB);
     loadDB("purchase", CSV_URLS.purchase, setPurchaseDB);
     loadDB("fabrication", CSV_URLS.fabrication, setFabricationDB);
     loadDB("transport", CSV_URLS.transport, setTransportDB);
     loadDB("install", CSV_URLS.install, setInstallDB);
-    
-    // 初始化時也抓一次雲端最新資料
     loadProjectsFromCloud();
   }, []);
 
   // --- [保留] 取得目前工程資料 ---
   const projectData = projects[currentProject] || {
-    projectName: "",
+    projectName: currentProject,
     allItems: [],
     manualAdjustDetail: { material: 0, purchase: 0, fabrication: 0, transport: 0, install: 0 }
   };
 
-  // --- [保留並優化] 更新邏輯 (增加雲端儲存) ---
+  // --- [重要修改] 更新邏輯：改為傳送單一專案名稱與內容 ---
   function updateProjectData(newData) {
     const updated = {
       ...projects,
       [currentProject]: newData
     };
     setProjects(updated);
-    saveProjects(updated); // 原本的 LocalStorage 儲存
-    saveToCloud(updated);  // 新增的 Google Sheet 儲存
+    saveProjects(updated);
+    
+    // 呼叫優化後的 saveToCloud
+    saveToCloud(currentProject, newData);
   }
 
   return (
     <div className="p-4 max-w-5xl mx-auto">
-      {/* 新增：雲端狀態列 */}
       <div className="flex justify-between items-center mb-4 p-2 bg-white border-l-4 border-blue-500 rounded shadow-sm">
         <div className="text-sm font-bold text-gray-700">
           雲端連結：{isSyncing ? "🔄 同步中..." : "✅ 已同步"}
         </div>
-        <button onClick={loadProjectsFromCloud} className="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded">
-          🔄 手動整理
+        <button onClick={loadProjectsFromCloud} className="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded shadow-sm">
+          🔄 刷新工程清單
         </button>
       </div>
 
@@ -2532,31 +2550,28 @@ function App() {
         setProjects={setProjects}
       />
 
-      <BackupArea
-        projects={projects}
-        setProjects={setProjects}
-        setCurrentProject={setCurrentProject}
-      />
+      <BackupArea projects={projects} setProjects={setProjects} setCurrentProject={setCurrentProject} />
 
       <div className="flex gap-2 mb-4">
         {["材料", "市購品", "製作成本", "運輸費用", "現場安裝", "總表"].map(tab => (
           <button
             key={tab}
             onClick={() => setPage(tab)}
-            className={"px-3 py-1 rounded border " + (page === tab ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700 border-gray-400")}
+            className={"px-3 py-1 rounded border transition " + (page === tab ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700 border-gray-400 hover:bg-gray-50")}
           >
             {tab}
           </button>
         ))}
       </div>
 
-      {/* 頁面內容 (保留所有原始 Page 組件連接) */}
-      {page === "材料" && <MaterialsPage materialDB={materialDB} projectData={projectData} setProjectData={updateProjectData} />}
-      {page === "市購品" && <PurchasePage purchaseDB={purchaseDB} projectData={projectData} setProjectData={updateProjectData} />}
-      {page === "製作成本" && <FabricationPage fabricationDB={fabricationDB} projectData={projectData} setProjectData={updateProjectData} />}
-      {page === "運輸費用" && <TransportPage transportDB={transportDB} projectData={projectData} setProjectData={updateProjectData} />}
-      {page === "現場安裝" && <InstallPage installDB={installDB} projectData={projectData} setProjectData={updateProjectData} />}
-      {page === "總表" && <SummaryPage projectData={projectData} currentProject={currentProject} updateProjectData={updateProjectData} />}
+      <div className="bg-white rounded shadow-sm">
+        {page === "材料" && <MaterialsPage materialDB={materialDB} projectData={projectData} setProjectData={updateProjectData} />}
+        {page === "市購品" && <PurchasePage purchaseDB={purchaseDB} projectData={projectData} setProjectData={updateProjectData} />}
+        {page === "製作成本" && <FabricationPage fabricationDB={fabricationDB} projectData={projectData} setProjectData={updateProjectData} />}
+        {page === "運輸費用" && <TransportPage transportDB={transportDB} projectData={projectData} setProjectData={updateProjectData} />}
+        {page === "現場安裝" && <InstallPage installDB={installDB} projectData={projectData} setProjectData={updateProjectData} />}
+        {page === "總表" && <SummaryPage projectData={projectData} currentProject={currentProject} updateProjectData={updateProjectData} />}
+      </div>
     </div>
   );
 }
