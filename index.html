@@ -2391,22 +2391,6 @@ function BackupArea({ projects, setProjects, setCurrentProject }) {
     </div>
   );
 }    
-/****************************************************
-* PART 10 — App（主控制）- 分列同步進階版
- * 功能：不同工程分開存放，避免多人使用時互相覆蓋
- ****************************************************/
-const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyKaX7bhCjK3cG2iUwqJrFkYAc_8Q2HCxuQdK67ZS2PLW6eO1dLoJVYdCyHhGUQg54k/exec";
-
-你好！我是程式夥伴。
-
-你提供的這段代碼是單一儲存格覆蓋版。如果只有你一個人使用沒問題，但如果有同事同時在改「不同工程」，這段代碼會導致互相覆蓋。
-
-為了達成你說的「多人同時使用不同工程互不干涉」，我們需要微調 saveToCloud 函數，讓它只發送「目前這個工程」的資料給 Google Apps Script (GAS)。
-
-以下是修改後的完整 PART 10，我已經幫你把「分次存檔」的邏輯加進去了：
-
-🛠️ 調整後的 PART 10 (支援多人分工程協作)
-JavaScript
 
 /****************************************************
  * PART 10 — App（主控制）- 分列同步進階版
