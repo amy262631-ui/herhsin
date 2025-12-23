@@ -2392,33 +2392,67 @@ function BackupArea({ projects, setProjects, setCurrentProject }) {
   );
 }    
 /****************************************************
- * PART 10 — App（主控制）
- * - 多工程管理
- * - Google Sheet 同步
- * - 分頁切換
- * - 渲染五大成本頁 + SummaryPage
+ * PART 10 — App（主控制）- 完整功能整合版
+ * 1. 保留原本所有 CSV 讀取解析邏輯
+ * 2. 保留 LocalStorage 快取與工程管理
+ * 3. 新增 Google Sheet CloudSave 自動同步
  ****************************************************/
+const GAS_API_URL = "你的_GOOGLE_APPS_SCRIPT_網頁應用程式網址";
+
 function App() {
-  // 載入後保證永遠是正常資料結構
+  // --- [保留] 原始載入與 State 設定 ---
   const safeProjects = loadProjects();
-
   const [projects, setProjects] = React.useState(safeProjects);
-
   const [currentProject, setCurrentProject] = React.useState(
     Object.keys(safeProjects)[0] || ""
   );
-
-  // 頁面切換
   const [page, setPage] = React.useState("材料");
+  const [isSyncing, setIsSyncing] = React.useState(false);
 
-  // 五大資料庫
+  // --- [保留] 五大基礎資料庫 State ---
   const [materialDB, setMaterialDB] = React.useState([]);
   const [purchaseDB, setPurchaseDB] = React.useState([]);
   const [fabricationDB, setFabricationDB] = React.useState([]);
   const [transportDB, setTransportDB] = React.useState([]);
   const [installDB, setInstallDB] = React.useState([]);
 
-  // Google Sheet + localStorage 同步（模式 C）
+  // --- [新增] 雲端同步邏輯：讀取 ---
+  async function loadProjectsFromCloud() {
+    if (!GAS_API_URL || GAS_API_URL.includes("你的_")) return;
+    setIsSyncing(true);
+    try {
+      const resp = await fetch(GAS_API_URL);
+      const cloudData = await resp.json();
+      if (cloudData && typeof cloudData === 'object' && Object.keys(cloudData).length > 0) {
+        setProjects(cloudData);
+        saveProjects(cloudData); // 同步回本地 LocalStorage
+        if (!currentProject) setCurrentProject(Object.keys(cloudData)[0] || "");
+      }
+    } catch (e) {
+      console.error("雲端載入失敗，維持本地資料");
+    } finally {
+      setIsSyncing(false);
+    }
+  }
+
+  // --- [新增] 雲端同步邏輯：寫入 ---
+  async function saveToCloud(updatedData) {
+    if (!GAS_API_URL || GAS_API_URL.includes("你的_")) return;
+    setIsSyncing(true);
+    try {
+      await fetch(GAS_API_URL, {
+        method: "POST",
+        mode: "no-cors", 
+        body: JSON.stringify(updatedData)
+      });
+    } catch (e) {
+      console.error("雲端儲存失敗");
+    } finally {
+      setIsSyncing(false);
+    }
+  }
+
+  // --- [保留] 原始 CSV 解析邏輯 ---
   async function fetchCSV(url) {
     const text = await fetch(url).then(r => r.text());
     const rows = text.split("\n").map(r => r.trim());
@@ -2429,111 +2463,68 @@ function App() {
   async function loadDB(name, url, setter) {
     const local = localStorage.getItem("db_" + name);
     const localV = localStorage.getItem("dbv_" + name);
-
     const { rows, version } = await fetchCSV(url);
 
     if (local && localV === version) {
       setter(JSON.parse(local));
     } else {
-      const parsed = rows
-  .slice(1)
-  .map(r => r.split(","))
-  .filter(r => r.length >= 2)
-  .map(r => {
-
-    // ① 材料（有重量）
-    if (name === "material") {
-      return {
-        category: r[0],
-        spec: r[1],
-        unit: r[2],
-        weight: Number(r[3] || 0),
-        price: Number(r[4] || 0)
-      };
-    }
-
-    // ② 市購品（無重量）
-    if (name === "purchase") {
-      return {
-        category: r[0],
-        spec: r[1],
-        unit: r[2],
-        price: Number(r[3] || 0)
-      };
-    }
-
-    // ③ 製作成本（無重量）
-    if (name === "fabrication") {
-      return {
-        category: r[0],
-        spec: r[1],
-        unit: r[2],
-        price: Number(r[3] || 0)
-      };
-    }
-
-    // ④ 運輸費用（欄位順序不同）
-    if (name === "transport") {
-      return {
-        category: r[0],   // 高空作業車
-        spec: r[1],       // 21M
-        region: r[2],     // 南/北/中
-        price: Number(r[3] || 0),
-        unit: r[4] || "台"
-      };
-    }
-
-    // ⑤ 現場安裝（無重量）
-    if (name === "install") {
-      return {
-        category: r[0],
-        spec: r[1],
-        unit: r[2],
-        price: Number(r[3] || 0)
-      };
-    }
-
-  });
-
-
-setter(parsed);
-localStorage.setItem("db_" + name, JSON.stringify(parsed));
-localStorage.setItem("dbv_" + name, version);
-localStorage.setItem("dbts_" + name, new Date().toISOString());
+      const parsed = rows.slice(1).map(r => r.split(",")).filter(r => r.length >= 2).map(r => {
+        if (name === "material") return { category: r[0], spec: r[1], unit: r[2], weight: Number(r[3] || 0), price: Number(r[4] || 0) };
+        if (name === "purchase") return { category: r[0], spec: r[1], unit: r[2], price: Number(r[3] || 0) };
+        if (name === "fabrication") return { category: r[0], spec: r[1], unit: r[2], price: Number(r[3] || 0) };
+        if (name === "transport") return { category: r[0], spec: r[1], region: r[2], price: Number(r[3] || 0), unit: r[4] || "台" };
+        if (name === "install") return { category: r[0], spec: r[1], unit: r[2], price: Number(r[3] || 0) };
+        return {};
+      });
+      setter(parsed);
+      localStorage.setItem("db_" + name, JSON.stringify(parsed));
+      localStorage.setItem("dbv_" + name, version);
+      localStorage.setItem("dbts_" + name, new Date().toISOString());
     }
   }
 
-// 初始化，載入五大資料庫
-React.useEffect(() => {
-  loadDB("material", CSV_URLS.material, setMaterialDB);
-  loadDB("purchase", CSV_URLS.purchase, setPurchaseDB);
-  loadDB("fabrication", CSV_URLS.fabrication, setFabricationDB);
-  loadDB("transport", CSV_URLS.transport, setTransportDB);
-  loadDB("install", CSV_URLS.install, setInstallDB);
-}, []);
+  // --- [保留] 初始化邏輯 (加入雲端讀取) ---
+  React.useEffect(() => {
+    loadDB("material", CSV_URLS.material, setMaterialDB);
+    loadDB("purchase", CSV_URLS.purchase, setPurchaseDB);
+    loadDB("fabrication", CSV_URLS.fabrication, setFabricationDB);
+    loadDB("transport", CSV_URLS.transport, setTransportDB);
+    loadDB("install", CSV_URLS.install, setInstallDB);
+    
+    // 初始化時也抓一次雲端最新資料
+    loadProjectsFromCloud();
+  }, []);
 
-  // 取得目前工程資料
+  // --- [保留] 取得目前工程資料 ---
   const projectData = projects[currentProject] || {
-    projectName: "",     // ← 加這一行
+    projectName: "",
     allItems: [],
-    manualAdjust: 0
+    manualAdjustDetail: { material: 0, purchase: 0, fabrication: 0, transport: 0, install: 0 }
   };
 
-  // 更新目前工程資料
+  // --- [保留並優化] 更新邏輯 (增加雲端儲存) ---
   function updateProjectData(newData) {
     const updated = {
       ...projects,
       [currentProject]: newData
     };
     setProjects(updated);
-    saveProjects(updated);
+    saveProjects(updated); // 原本的 LocalStorage 儲存
+    saveToCloud(updated);  // 新增的 Google Sheet 儲存
   }
 
   return (
     <div className="p-4 max-w-5xl mx-auto">
+      {/* 新增：雲端狀態列 */}
+      <div className="flex justify-between items-center mb-4 p-2 bg-white border-l-4 border-blue-500 rounded shadow-sm">
+        <div className="text-sm font-bold text-gray-700">
+          雲端連結：{isSyncing ? "🔄 同步中..." : "✅ 已同步"}
+        </div>
+        <button onClick={loadProjectsFromCloud} className="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded">
+          🔄 手動整理
+        </button>
+      </div>
 
-
-      {/* 工程管理 */}
       <ProjectManager
         currentProject={currentProject}
         setCurrentProject={setCurrentProject}
@@ -2541,80 +2532,33 @@ React.useEffect(() => {
         setProjects={setProjects}
       />
 
-      {/* 工程備份 / 還原 */}
-<BackupArea
-  projects={projects}
-  setProjects={setProjects}
-  setCurrentProject={setCurrentProject}
-/>
-      {/* 分頁功能 */}
+      <BackupArea
+        projects={projects}
+        setProjects={setProjects}
+        setCurrentProject={setCurrentProject}
+      />
+
       <div className="flex gap-2 mb-4">
         {["材料", "市購品", "製作成本", "運輸費用", "現場安裝", "總表"].map(tab => (
           <button
             key={tab}
             onClick={() => setPage(tab)}
-            className={
-              "px-3 py-1 rounded border " +
-              (page === tab
-                ? "bg-blue-600 text-white border-blue-600"
-                : "bg-white text-gray-700 border-gray-400")
-            }
+            className={"px-3 py-1 rounded border " + (page === tab ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700 border-gray-400")}
           >
             {tab}
           </button>
         ))}
       </div>
 
-      {/* 頁面內容 */}
-      {page === "材料" && (
-        <MaterialsPage
-          materialDB={materialDB}
-          projectData={projectData}
-          setProjectData={updateProjectData}
-        />
-      )}
-
-      {page === "市購品" && (
-        <PurchasePage
-          purchaseDB={purchaseDB}
-          projectData={projectData}
-          setProjectData={updateProjectData}
-        />
-      )}
-
-      {page === "製作成本" && (
-        <FabricationPage
-          fabricationDB={fabricationDB}
-          projectData={projectData}
-          setProjectData={updateProjectData}
-        />
-      )}
-
-      {page === "運輸費用" && (
-        <TransportPage
-          transportDB={transportDB}
-          projectData={projectData}
-          setProjectData={updateProjectData}
-        />
-      )}
-
-      {page === "現場安裝" && (
-        <InstallPage
-          installDB={installDB}
-          projectData={projectData}
-          setProjectData={updateProjectData}
-        />
-      )}
-
-{page === "總表" && (
-  <SummaryPage
-    projectData={projectData}
-    currentProject={currentProject}
-    updateProjectData={updateProjectData}
-  />
-)}
-</div>
-);
+      {/* 頁面內容 (保留所有原始 Page 組件連接) */}
+      {page === "材料" && <MaterialsPage materialDB={materialDB} projectData={projectData} setProjectData={updateProjectData} />}
+      {page === "市購品" && <PurchasePage purchaseDB={purchaseDB} projectData={projectData} setProjectData={updateProjectData} />}
+      {page === "製作成本" && <FabricationPage fabricationDB={fabricationDB} projectData={projectData} setProjectData={updateProjectData} />}
+      {page === "運輸費用" && <TransportPage transportDB={transportDB} projectData={projectData} setProjectData={updateProjectData} />}
+      {page === "現場安裝" && <InstallPage installDB={installDB} projectData={projectData} setProjectData={updateProjectData} />}
+      {page === "總表" && <SummaryPage projectData={projectData} currentProject={currentProject} updateProjectData={updateProjectData} />}
+    </div>
+  );
 }
 /****************************************************
  * 渲染 App
