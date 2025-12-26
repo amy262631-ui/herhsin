@@ -1303,17 +1303,19 @@ function TransportPage({ transportDB, projectData, setProjectData }) {
 
     const newItem = {
       type: "運輸費用",
-      category,
-      spec,
-      region,
+      category: category.trim(), // 🚀 加上 trim 防止空格
+      spec: spec.trim(),         // 🚀 加上 trim
+      region: region.trim(),
       qty: Number(qty),
       unitPrice,
-      subtotal
+      subtotal,
+      equipment: "" // 補上設備名稱欄位，保持結構一致
     };
 
+    // 🚀 強制觸發 App.js 的 updateProjectData
     setProjectData({
       ...projectData,
-      allItems: [...projectData.allItems, newItem]
+      allItems: [...(projectData.allItems || []), newItem]
     });
 
     setCategory("");
@@ -1649,20 +1651,22 @@ function InstallPage({ installDB, projectData, setProjectData }) {
 
     const item = {
       type: "現場安裝",
-      category,
-      spec,
-      unit: selectedRow?.unit || "",
+      category: (category || "").trim(), // 🚀 確保去除空白
+      spec: (spec || "").trim(),         // 🚀 確保去除空白
+      unit: (selectedRow?.unit || "").trim(),
       qty: Number(qty),
-      price,
-      subtotal
+      price: Number(price || 0),
+      subtotal: Number(subtotal || 0),
+      equipment: "" // 🚀 補上這行，確保結構與材料頁面一致
     };
 
+    // 🚀 使用更安全的展開方式，並確保觸發 App 的 updateProjectData
     const updated = {
       ...projectData,
-      allItems: [...projectData.allItems, item]
+      allItems: [...(projectData.allItems || []), item]
     };
 
-    setProjectData(updated);
+    setProjectData(updated); 
 
     setSpec("");
     setQty("");
