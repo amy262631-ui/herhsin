@@ -1641,32 +1641,42 @@ function InstallPage({ installDB, projectData, setProjectData }) {
 
   const price = selectedRow ? Number(selectedRow.price) : 0;
   const subtotal = price * Number(qty || 0);
-
-  function addToList() {
+function addToList() {
+    // 1. 基本防呆
     if (!category || !spec || !qty) {
-      alert("請完整輸入安裝資訊");
+      alert("請選擇分類、規格並輸入數量");
       return;
     }
 
+    // 2. 核心修正：確保 selectedRow 存在，否則預設單價為 0
+    // 這樣可以防止因為抓不到單價而導致整行程式「卡死」
+    const currentPrice = selectedRow ? Number(selectedRow.price) : 0;
+    const currentUnit = selectedRow ? (selectedRow.unit || "") : "";
+
     const item = {
       type: "現場安裝",
-      // 🚀 關鍵：補上 equipment 欄位
-      equipment: (equipName || "").trim(), 
+      // 🚀 補上設備名稱欄位，讓結構跟材料/市購品統一 (如果你的UI有equipName的話)
+      equipment: (typeof equipName !== 'undefined' ? equipName : "").trim(), 
       category: category.trim(),
       spec: spec.trim(),
-      unit: (selectedRow?.unit || "").trim(),
+      unit: currentUnit.trim(),
       qty: Number(qty),
-      price: Number(selectedRow?.price || 0),
-      subtotal: Number(qty) * Number(selectedRow?.price || 0)
+      price: currentPrice,
+      subtotal: Number(qty) * currentPrice
     };
 
-    setProjectData({
+    // 3. 執行更新（這會觸發 App 的 updateProjectData 與 saveToCloud）
+    const updated = {
       ...projectData,
       allItems: [...(projectData.allItems || []), item]
-    });
+    };
 
-    setEquipName(""); 
+    setProjectData(updated); 
+
+    // 4. 清空輸入框
+    setSpec("");
     setQty("");
+    if (typeof setEquipName === 'function') setEquipName("");
   }
 
   const items = projectData.allItems.filter(i => i.type === "現場安裝");
