@@ -2402,66 +2402,54 @@ function App() {
   const [projects, setProjects] = React.useState(() => loadProjects());
   const [currentProject, setCurrentProject] = React.useState(Object.keys(loadProjects())[0] || "");
   const [page, setPage] = React.useState("材料");
-  
-  // 狀態控制
-  const [isSyncing, setIsSyncing] = React.useState(false); // 是否正在與雲端溝通
-  const [hasUnsavedChanges, setHasUnsavedChanges] = React.useState(false); // 是否有尚未存進雲端的內容
+  const [isSyncing, setIsSyncing] = React.useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = React.useState(false);
 
-  // 五大基礎資料庫 (基礎單價)
   const [materialDB, setMaterialDB] = React.useState([]);
   const [purchaseDB, setPurchaseDB] = React.useState([]);
   const [fabricationDB, setFabricationDB] = React.useState([]);
   const [transportDB, setTransportDB] = React.useState([]);
   const [installDB, setInstallDB] = React.useState([]);
 
-  // --- ☁️ 雲端讀取：加入安全鎖 ---
+  // --- 雲端讀取：採用「合併」而非「覆蓋」 ---
   async function loadProjectsFromCloud() {
-    if (hasUnsavedChanges) {
-      if (!confirm("您有尚未同步到雲端的修改，現在抓取可能會覆蓋掉新資料，確定要刷新嗎？")) return;
-    }
-    
     setIsSyncing(true);
     try {
       const resp = await fetch(GAS_API_URL);
       const cloudData = await resp.json();
-      if (cloudData && typeof cloudData === 'object' && Object.keys(cloudData).length > 0) {
+      if (cloudData && typeof cloudData === 'object') {
         setProjects(prev => {
-           const merged = { ...prev, ...cloudData };
-           saveProjects(merged);
-           return merged;
+          // 🚀 關鍵：將本地最新資料與雲端資料合併，確保本地修改優先
+          const merged = { ...cloudData, ...prev }; 
+          saveProjects(merged);
+          return merged;
         });
         setHasUnsavedChanges(false);
       }
-    } catch (e) {
-      console.error("雲端載入失敗");
-    } finally {
-      setIsSyncing(false);
-    }
+    } catch (e) { console.error("載入失敗"); }
+    finally { setIsSyncing(false); }
   }
 
-  // --- ☁️ 雲端儲存：確保成功 ---
+  // --- 雲端儲存 ---
   async function saveToCloud(projectName, projectDetail) {
     setIsSyncing(true);
     try {
-      // 使用 Blob 確保資料格式正確傳送
-      const blob = new Blob([JSON.stringify({ projectName, data: projectDetail })], { type: 'application/json' });
       await fetch(GAS_API_URL, {
         method: "POST",
-        mode: "no-cors",
-        body: blob
+        body: JSON.stringify({ projectName, data: projectDetail })
       });
-      // 由於 no-cors 無法取得回傳值，我們設定一個延遲來解除鎖定
+      // 給予小延遲確保 GAS 寫入完成
       setTimeout(() => {
         setIsSyncing(false);
         setHasUnsavedChanges(false);
-      }, 1500); 
-    } catch (e) {
-      console.error("雲端儲存出錯:", e);
+      }, 1000);
+    } catch (e) { 
       setIsSyncing(false);
+      console.error("儲存失敗"); 
     }
   }
 
-  // --- [保留] 原始 CSV 讀取 (不變) ---
+  // [保留原本的 loadDB, fetchCSV ...]
   async function fetchCSV(url) {
     const text = await fetch(url).then(r => r.text());
     const rows = text.split("\n").map(r => r.trim());
@@ -2499,38 +2487,24 @@ function App() {
     loadProjectsFromCloud();
   }, []);
 
-  const projectData = projects[currentProject] || {
-    projectName: currentProject,
-    allItems: [],
-    manualAdjustDetail: { material: 0, purchase: 0, fabrication: 0, transport: 0, install: 0 }
-  };
+  const projectData = projects[currentProject] || { allItems: [], manualAdjustDetail: {} };
 
-  // --- 更新邏輯 ---
   function updateProjectData(newData) {
-    setHasUnsavedChanges(true); // 標記為有新資料尚未同步
+    setHasUnsavedChanges(true);
     const updated = { ...projects, [currentProject]: newData };
     setProjects(updated);
-    saveProjects(updated); // 立即鎖定本地
-    saveToCloud(currentProject, newData); // 非同步傳送雲端
+    saveProjects(updated);
+    saveToCloud(currentProject, newData);
   }
 
   return (
     <div className="p-4 max-w-5xl mx-auto">
-      {/* 狀態提示列 */}
-      <div className={`flex justify-between items-center mb-4 p-3 rounded shadow-md border-l-4 ${isSyncing ? 'bg-yellow-50 border-yellow-500' : 'bg-green-50 border-green-500'}`}>
-        <div>
-          <span className="font-bold text-gray-800">
-            {isSyncing ? "🔄 雲端同步中..." : "✅ 雲端連線正常"}
-          </span>
-          {hasUnsavedChanges && <span className="ml-2 text-red-600 text-sm">(有新資料儲存中，請勿重新整理)</span>}
+      <div className={`flex justify-between items-center mb-4 p-3 rounded shadow border-l-4 ${isSyncing ? 'bg-orange-50 border-orange-500' : 'bg-green-50 border-green-500'}`}>
+        <div className="text-sm font-bold">
+          {isSyncing ? "🔄 雲端同步中..." : "✅ 雲端已連線"}
+          {hasUnsavedChanges && <span className="ml-2 text-red-500">(新資料儲存中)</span>}
         </div>
-        <button 
-          onClick={loadProjectsFromCloud} 
-          disabled={isSyncing}
-          className="bg-white px-4 py-1 rounded border hover:bg-gray-50 disabled:opacity-50 text-sm font-medium"
-        >
-          刷新雲端
-        </button>
+        <button onClick={loadProjectsFromCloud} disabled={isSyncing} className="bg-white px-3 py-1 rounded border text-xs hover:bg-gray-50 disabled:opacity-50">刷新資料</button>
       </div>
 
       <ProjectManager currentProject={currentProject} setCurrentProject={setCurrentProject} projects={projects} setProjects={setProjects} />
@@ -2538,17 +2512,11 @@ function App() {
 
       <div className="flex gap-2 mb-4">
         {["材料", "市購品", "製作成本", "運輸費用", "現場安裝", "總表"].map(tab => (
-          <button
-            key={tab}
-            onClick={() => setPage(tab)}
-            className={"px-4 py-2 rounded border font-bold transition " + (page === tab ? "bg-blue-600 text-white border-blue-600 shadow-lg" : "bg-white text-gray-700 border-gray-400")}
-          >
-            {tab}
-          </button>
+          <button key={tab} onClick={() => setPage(tab)} className={"px-3 py-1 rounded border " + (page === tab ? "bg-blue-600 text-white" : "bg-white")}>{tab}</button>
         ))}
       </div>
 
-      <div className="bg-white rounded-xl shadow-lg border border-gray-100">
+      <div className="bg-white rounded shadow p-2">
         {page === "材料" && <MaterialsPage materialDB={materialDB} projectData={projectData} setProjectData={updateProjectData} />}
         {page === "市購品" && <PurchasePage purchaseDB={purchaseDB} projectData={projectData} setProjectData={updateProjectData} />}
         {page === "製作成本" && <FabricationPage fabricationDB={fabricationDB} projectData={projectData} setProjectData={updateProjectData} />}
