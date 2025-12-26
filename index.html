@@ -2353,12 +2353,24 @@ function App() {
 
   const projectData = projects[currentProject] || { allItems: [], manualAdjustDetail: {} };
 
-  function updateProjectData(newData) {
+ function updateProjectData(newData) {
+    // 1. 立即標記為修改中，並在畫面顯示 (正在儲存您的修改)
     setHasUnsavedChanges(true);
-    const updated = { ...projects, [currentProject]: newData };
-    setProjects(updated);
-    saveProjects(updated);
-    saveToCloud(currentProject, newData);
+
+    // 2. 獲取最新狀態並更新
+    setProjects(prev => {
+      // 🚀 使用 functional update (prev => ...) 確保拿到的永遠是「當下最新」的工程清單
+      const updated = { ...prev, [currentProject]: newData };
+      
+      // 3. 儲存到本地 LocalStorage
+      saveProjects(updated);
+      
+      // 4. 同步到雲端 (Google Sheet)
+      // 這裡傳入最新的 newData，確保雲端收到的是剛剛修改後的結果
+      saveToCloud(currentProject, newData);
+      
+      return updated;
+    });
   }
 
   return (
