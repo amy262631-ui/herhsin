@@ -2393,41 +2393,40 @@ function BackupArea({ projects, setProjects, setCurrentProject }) {
 }    
 
 /****************************************************
- * PART 10 — App（主控制）- 分列同步進階版
- * 1. 支援多人同時使用不同工程 (不互相覆蓋)
- * 2. 保留原本所有功能與 CSV 讀取
+ * PART 10 — App（主控制）- 穩定同步版
+ * 修正：輸入資料不及時、資料被雲端舊資料覆蓋的問題
  ****************************************************/
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyKaX7bhCjK3cG2iUwqJrFkYAc_8Q2HCxuQdK67ZS2PLW6eO1dLoJVYdCyHhGUQg54k/exec";
 
 function App() {
-  // --- [保留] 原始載入與 State 設定 ---
-  const safeProjects = loadProjects();
-  const [projects, setProjects] = React.useState(safeProjects);
-  const [currentProject, setCurrentProject] = React.useState(
-    Object.keys(safeProjects)[0] || ""
-  );
+  const [projects, setProjects] = React.useState(() => loadProjects());
+  const [currentProject, setCurrentProject] = React.useState(Object.keys(loadProjects())[0] || "");
   const [page, setPage] = React.useState("材料");
   const [isSyncing, setIsSyncing] = React.useState(false);
 
-  // --- [保留] 五大基礎資料庫 State ---
+  // 五大基礎資料庫 State
   const [materialDB, setMaterialDB] = React.useState([]);
   const [purchaseDB, setPurchaseDB] = React.useState([]);
   const [fabricationDB, setFabricationDB] = React.useState([]);
   const [transportDB, setTransportDB] = React.useState([]);
   const [installDB, setInstallDB] = React.useState([]);
 
-  // --- [優化] 雲端同步邏輯：讀取全體 ---
+  // --- 雲端讀取：加入保護機制 ---
   async function loadProjectsFromCloud() {
     if (!GAS_API_URL || GAS_API_URL.includes("你的_")) return;
+    if (isSyncing) return; // 如果正在存檔，不要同時讀取，避免資料衝突
+    
     setIsSyncing(true);
     try {
       const resp = await fetch(GAS_API_URL);
       const cloudData = await resp.json();
       if (cloudData && typeof cloudData === 'object') {
-        // 合併雲端與本地資料，以雲端為主
-        setProjects(cloudData);
-        saveProjects(cloudData); 
-        if (!currentProject) setCurrentProject(Object.keys(cloudData)[0] || "");
+        // 🚀 重要：使用 functional update 確保狀態正確合併
+        setProjects(prev => {
+           const merged = { ...prev, ...cloudData };
+           saveProjects(merged);
+           return merged;
+        });
       }
     } catch (e) {
       console.error("雲端載入失敗");
@@ -2436,28 +2435,26 @@ function App() {
     }
   }
 
-  // --- [優化] 雲端同步邏輯：精準寫入單一工程 ---
-  // 這樣你在改 A 工程時，不會影響到同事正在改的 B 工程
+  // --- 雲端儲存：改為更可靠的 POST ---
   async function saveToCloud(projectName, projectDetail) {
-    if (!GAS_API_URL || GAS_API_URL.includes("你的_")) return;
     setIsSyncing(true);
     try {
       await fetch(GAS_API_URL, {
         method: "POST",
-        // 注意：不傳送整個 projects，只傳送「這一個」工程
         body: JSON.stringify({
           projectName: projectName,
           data: projectDetail
         })
       });
+      console.log(`✅ 工程 ${projectName} 已成功備份至雲端`);
     } catch (e) {
-      console.error("雲端儲存失敗");
+      console.error("❌ 雲端儲存失敗:", e);
     } finally {
       setIsSyncing(false);
     }
   }
 
-  // --- [保留] 原始 CSV 解析邏輯 ---
+  // --- [保留] 原有 CSV 讀取 (不變) ---
   async function fetchCSV(url) {
     const text = await fetch(url).then(r => r.text());
     const rows = text.split("\n").map(r => r.trim());
@@ -2486,7 +2483,6 @@ function App() {
     }
   }
 
-  // --- [保留] 初始化邏輯 ---
   React.useEffect(() => {
     loadDB("material", CSV_URLS.material, setMaterialDB);
     loadDB("purchase", CSV_URLS.purchase, setPurchaseDB);
@@ -2496,44 +2492,39 @@ function App() {
     loadProjectsFromCloud();
   }, []);
 
-  // --- [保留] 取得目前工程資料 ---
   const projectData = projects[currentProject] || {
     projectName: currentProject,
     allItems: [],
     manualAdjustDetail: { material: 0, purchase: 0, fabrication: 0, transport: 0, install: 0 }
   };
 
-  // --- [重要修改] 更新邏輯：改為傳送單一專案名稱與內容 ---
+  // --- [關鍵修正] 更新邏輯：先存本地，確保 UI 即時回應 ---
   function updateProjectData(newData) {
-    const updated = {
-      ...projects,
-      [currentProject]: newData
-    };
+    // 1. 立即更新 UI 與 LocalStorage (保證輸入不消失)
+    const updated = { ...projects, [currentProject]: newData };
     setProjects(updated);
     saveProjects(updated);
     
-    // 呼叫優化後的 saveToCloud
+    // 2. 背景同步至雲端 (不影響 UI)
     saveToCloud(currentProject, newData);
   }
 
   return (
     <div className="p-4 max-w-5xl mx-auto">
-      <div className="flex justify-between items-center mb-4 p-2 bg-white border-l-4 border-blue-500 rounded shadow-sm">
+      <div className={`flex justify-between items-center mb-4 p-2 bg-white border-l-4 rounded shadow-sm ${isSyncing ? 'border-orange-500' : 'border-blue-500'}`}>
         <div className="text-sm font-bold text-gray-700">
-          雲端連結：{isSyncing ? "🔄 同步中..." : "✅ 已同步"}
+          雲端狀態：{isSyncing ? "🔄 同步中 (請稍候)..." : "✅ 資料已就緒"}
         </div>
-        <button onClick={loadProjectsFromCloud} className="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded shadow-sm">
-          🔄 刷新工程清單
+        <button 
+          onClick={loadProjectsFromCloud} 
+          disabled={isSyncing}
+          className="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded shadow-sm disabled:opacity-50"
+        >
+          🔄 重新抓取雲端資料
         </button>
       </div>
 
-      <ProjectManager
-        currentProject={currentProject}
-        setCurrentProject={setCurrentProject}
-        projects={projects}
-        setProjects={setProjects}
-      />
-
+      <ProjectManager currentProject={currentProject} setCurrentProject={setCurrentProject} projects={projects} setProjects={setProjects} />
       <BackupArea projects={projects} setProjects={setProjects} setCurrentProject={setCurrentProject} />
 
       <div className="flex gap-2 mb-4">
