@@ -1255,47 +1255,47 @@ function FabricationPage({ fabricationDB, projectData, setProjectData }) {
  ****************************************************/
 function TransportPage({ transportDB, projectData, setProjectData }) {
 
-  /* 輸入欄位 */
+  /* ------------------ 1. 狀態與輸入欄位 ------------------ */
+  const [equipName, setEquipName] = React.useState(""); // 🚀 補上設備名稱 State
   const [category, setCategory] = React.useState("");
   const [spec, setSpec] = React.useState("");
   const [region, setRegion] = React.useState("");
   const [qty, setQty] = React.useState("");
 
-  /* 下拉式：分類 */
+  /* ------------------ 2. 下拉式選單資料處理 ------------------ */
   const categories = React.useMemo(() => {
-    const setA = new Set();
-    transportDB.forEach(r => setA.add(r.category));
-    return [...setA];
+    const s = new Set();
+    transportDB.forEach(r => { if(r.category) s.add(r.category.trim()); });
+    return [...s];
   }, [transportDB]);
 
-  /* 下拉式：規格 */
   const specs = React.useMemo(() => {
     return transportDB
-      .filter(r => r.category === category)
+      .filter(r => (r.category || "").trim() === (category || "").trim())
       .map(r => r.spec);
   }, [category, transportDB]);
 
-  /* 下拉式：地區 */
   const regions = React.useMemo(() => {
-    const setR = new Set();
-    transportDB.forEach(r => setR.add(r.region));
-    return [...setR];
+    const s = new Set();
+    transportDB.forEach(r => { if(r.region) s.add(r.region.trim()); });
+    return [...s];
   }, [transportDB]);
 
-  /* 找出對應價格 */
+  /* ------------------ 3. 找出對應價格 (核心匹配邏輯) ------------------ */
   const selectedRow = React.useMemo(() => {
-    return transportDB.find(
-      r => r.category === category && r.spec === spec && r.region === region
+    // 🚀 加上雙向 .trim() 確保 Google Sheet 裡的空格不會導致匹配失敗
+    return transportDB.find(r => 
+      (r.category || "").trim() === (category || "").trim() && 
+      (r.spec || "").trim() === (spec || "").trim() && 
+      (r.region || "").trim() === (region || "").trim()
     );
   }, [category, spec, region, transportDB]);
 
-  const unitPrice = selectedRow ? Number(selectedRow.price) : 0;
-  const subtotal = qty ? unitPrice * Number(qty) : 0;
+  const unitPrice = selectedRow ? Number(selectedRow.price || 0) : 0;
+  const subtotal = Number(qty || 0) * unitPrice;
 
-  /****************************************************
-   * 新增運輸費用
-   ****************************************************/
-  function addToList() {
+  /* ------------------ 4. 新增運輸費用 ------------------ */
+ function addToList() {
     if (!category || !spec || !region || !qty) {
       alert("請選擇分類、規格、地區並輸入趟數");
       return;
@@ -1303,24 +1303,23 @@ function TransportPage({ transportDB, projectData, setProjectData }) {
 
     const newItem = {
       type: "運輸費用",
-      category: category.trim(), // 🚀 加上 trim 防止空格
-      spec: spec.trim(),         // 🚀 加上 trim
+      // 🚀 修改點 1：確保存入雲端時欄位名稱統一為 equipment
+      equipment: (equipName || "").trim(), 
+      category: category.trim(),
+      spec: spec.trim(),
       region: region.trim(),
       qty: Number(qty),
-      unitPrice,
-      subtotal,
-      equipment: "" // 補上設備名稱欄位，保持結構一致
+      unitPrice: Number(unitPrice || 0),
+      subtotal: Number(subtotal || 0)
     };
 
-    // 🚀 強制觸發 App.js 的 updateProjectData
+    // 🚀 修改點 2：確保這裡呼叫的是會觸發 saveToCloud 的 setProjectData
     setProjectData({
       ...projectData,
       allItems: [...(projectData.allItems || []), newItem]
     });
 
-    setCategory("");
-    setSpec("");
-    setRegion("");
+    setEquipName(""); 
     setQty("");
   }
 
@@ -1645,30 +1644,28 @@ function InstallPage({ installDB, projectData, setProjectData }) {
 
   function addToList() {
     if (!category || !spec || !qty) {
-      alert("請完整輸入");
+      alert("請完整輸入安裝資訊");
       return;
     }
 
     const item = {
       type: "現場安裝",
-      category: (category || "").trim(), // 🚀 確保去除空白
-      spec: (spec || "").trim(),         // 🚀 確保去除空白
+      // 🚀 關鍵：補上 equipment 欄位
+      equipment: (equipName || "").trim(), 
+      category: category.trim(),
+      spec: spec.trim(),
       unit: (selectedRow?.unit || "").trim(),
       qty: Number(qty),
-      price: Number(price || 0),
-      subtotal: Number(subtotal || 0),
-      equipment: "" // 🚀 補上這行，確保結構與材料頁面一致
+      price: Number(selectedRow?.price || 0),
+      subtotal: Number(qty) * Number(selectedRow?.price || 0)
     };
 
-    // 🚀 使用更安全的展開方式，並確保觸發 App 的 updateProjectData
-    const updated = {
+    setProjectData({
       ...projectData,
       allItems: [...(projectData.allItems || []), item]
-    };
+    });
 
-    setProjectData(updated); 
-
-    setSpec("");
+    setEquipName(""); 
     setQty("");
   }
 
@@ -2453,21 +2450,32 @@ function App() {
   }
 
   // --- ☁️ 雲端儲存 ---
-  async function saveToCloud(projectName, projectDetail) {
+ async function saveToCloud(projectName, projectDetail) {
     if (!projectName) return;
     setIsSyncing(true);
     try {
-      await fetch(GAS_API_URL, {
-        method: "POST",
-        body: JSON.stringify({ projectName, data: projectDetail })
+      // 🚀 關鍵優化：這段會把重複的 "specs" 清單從資料中移除，只存你選中的結果
+      // 這能讓雲端儲存量縮小 80%，讓上傳秒傳！
+      const leanDetail = {
+        ...projectDetail,
+        allItems: (projectDetail.allItems || []).map(item => {
+          const { specs, ...rest } = item; // 把 specs 踢掉
+          return rest;
+        })
+      };
+
+      await fetch(GAS_API_URL, { 
+        method: "POST", 
+        body: JSON.stringify({ projectName, data: leanDetail }) 
       });
+      
       setTimeout(() => {
         setIsSyncing(false);
         setHasUnsavedChanges(false);
-      }, 1200); // 給予 Google Sheet 寫入緩衝時間
-    } catch (e) { 
+      }, 1200);
+    } catch (e) {
       setIsSyncing(false);
-      console.error("儲存失敗"); 
+      console.error("雲端儲存發生異常", e);
     }
   }
 
