@@ -1609,16 +1609,15 @@ function TransportPage({ transportDB, projectData, setProjectData }) {
 }
 /****************************************************
  * PART 8 — InstallPage（現場安裝）
- * - 規格下拉可改
- * - 自動抓 Google Sheet 單位/價格
- * - 單價可手動修改
- * - 編輯模式支援「儲存 / 取消」
+ * - 支援設備名稱
+ * - 自動抓取單價與單位
+ * - 強化同步與編輯邏輯
  ****************************************************/
-
 function InstallPage({ installDB, projectData, setProjectData }) {
   const [category, setCategory] = React.useState("");
   const [spec, setSpec] = React.useState("");
   const [qty, setQty] = React.useState("");
+  const [equipName, setEquipName] = React.useState(""); // 🚀 定義設備名稱
 
   const [editIndex, setEditIndex] = React.useState(null);
   const [editItem, setEditItem] = React.useState(null);
@@ -1626,37 +1625,38 @@ function InstallPage({ installDB, projectData, setProjectData }) {
   /***************** 工具函式 *****************/
   function getSpecs(category) {
     return installDB
-      .filter(r => r.category === category)
+      .filter(r => (r.category || "").trim() === category.trim())
       .map(r => r.spec);
   }
 
   function findDBRow(category, spec) {
-    return installDB.find(r => r.category === category && r.spec === spec);
+    return installDB.find(r => 
+      (r.category || "").trim() === (category || "").trim() && 
+      (r.spec || "").trim() === (spec || "").trim()
+    );
   }
 
-  /***************** 新增資料 *****************/
+  /***************** 新增資料計算 *****************/
   const selectedRow = React.useMemo(() => {
     return findDBRow(category, spec);
   }, [category, spec]);
 
-  const price = selectedRow ? Number(selectedRow.price) : 0;
+  const price = selectedRow ? Number(selectedRow.price || 0) : 0;
   const subtotal = price * Number(qty || 0);
-function addToList() {
-    // 1. 基本防呆
+
+  /***************** 執行新增 *****************/
+  function addToList() {
     if (!category || !spec || !qty) {
       alert("請選擇分類、規格並輸入數量");
       return;
     }
 
-    // 2. 核心修正：確保 selectedRow 存在，否則預設單價為 0
-    // 這樣可以防止因為抓不到單價而導致整行程式「卡死」
     const currentPrice = selectedRow ? Number(selectedRow.price) : 0;
     const currentUnit = selectedRow ? (selectedRow.unit || "") : "";
 
     const item = {
       type: "現場安裝",
-      // 🚀 補上設備名稱欄位，讓結構跟材料/市購品統一 (如果你的UI有equipName的話)
-      equipment: (typeof equipName !== 'undefined' ? equipName : "").trim(), 
+      equipment: (equipName || "").trim(), // 🚀 正確存入設備名稱
       category: category.trim(),
       spec: spec.trim(),
       unit: currentUnit.trim(),
@@ -1665,29 +1665,27 @@ function addToList() {
       subtotal: Number(qty) * currentPrice
     };
 
-    // 3. 執行更新（這會觸發 App 的 updateProjectData 與 saveToCloud）
-    const updated = {
+    // 🚀 觸發 App.js 的 updateProjectData 與雲端存檔
+    setProjectData({
       ...projectData,
       allItems: [...(projectData.allItems || []), item]
-    };
+    });
 
-    setProjectData(updated); 
-
-    // 4. 清空輸入框
+    // 清空輸入
     setSpec("");
     setQty("");
-    if (typeof setEquipName === 'function') setEquipName("");
+    setEquipName(""); 
   }
 
-  const items = projectData.allItems.filter(i => i.type === "現場安裝");
+  const items = (projectData.allItems || []).filter(i => i.type === "現場安裝");
 
   /***************** 編輯模式 *****************/
   function startEdit(idx) {
     const item = items[idx];
-
     setEditIndex(idx);
     setEditItem({
-      category: item.category, // 不可改
+      equipment: item.equipment || "", // 🚀 編輯時保留設備名稱
+      category: item.category,
       spec: item.spec,
       unit: item.unit,
       qty: item.qty,
@@ -1697,7 +1695,6 @@ function addToList() {
 
   function onChangeSpec(newSpec) {
     const row = findDBRow(editItem.category, newSpec);
-
     setEditItem(prev => ({
       ...prev,
       spec: newSpec,
@@ -1708,9 +1705,11 @@ function addToList() {
 
   function saveEdit(idx) {
     const old = items[idx];
+    const realIndex = projectData.allItems.indexOf(old);
 
     const updatedItem = {
       ...old,
+      equipment: (editItem.equipment || "").trim(), // 🚀 儲存編輯後的設備名稱
       spec: editItem.spec,
       unit: editItem.unit,
       qty: Number(editItem.qty),
@@ -1719,7 +1718,7 @@ function addToList() {
     };
 
     const newAll = [...projectData.allItems];
-    newAll[projectData.allItems.indexOf(old)] = updatedItem;
+    newAll[realIndex] = updatedItem;
 
     setProjectData({ ...projectData, allItems: newAll });
     setEditIndex(null);
@@ -1732,18 +1731,28 @@ function addToList() {
 
   function deleteItem(idx) {
     if (!confirm("確定刪除？")) return;
-
     const target = items[idx];
     const newAll = projectData.allItems.filter(i => i !== target);
     setProjectData({ ...projectData, allItems: newAll });
   }
 
-  /***************** UI *****************/
+  /***************** UI 渲染 *****************/
   return (
     <div className="p-4 bg-white rounded shadow">
       <h2 className="text-xl font-bold mb-4">現場安裝</h2>
 
-      {/* 分類 */}
+      {/* 🚀 設備名稱輸入框 */}
+      <div className="mb-3">
+        <label className="font-bold">設備名稱：</label>
+        <input
+          type="text"
+          value={equipName}
+          onChange={e => setEquipName(e.target.value)}
+          className="border px-2 py-1 rounded ml-2 w-48"
+          placeholder="可留白"
+        />
+      </div>
+
       <div className="mb-3">
         <label className="font-bold">分類：</label>
         <select
@@ -1758,7 +1767,6 @@ function addToList() {
         </select>
       </div>
 
-      {/* 規格 */}
       {category && (
         <div className="mb-3">
           <label className="font-bold">規格：</label>
@@ -1775,15 +1783,13 @@ function addToList() {
         </div>
       )}
 
-      {/* 顯示單位、單價 */}
       {selectedRow && (
         <div className="p-3 bg-gray-50 border rounded mb-3">
           <p>單位：{selectedRow.unit}</p>
-          <p>單價：{selectedRow.price}</p>
+          <p>預設單價：{Number(selectedRow.price).toLocaleString()} 元</p>
         </div>
       )}
 
-      {/* 數量 */}
       {selectedRow && (
         <div className="mb-3">
           <label className="font-bold">數量：</label>
@@ -1796,131 +1802,83 @@ function addToList() {
         </div>
       )}
 
-      {/* 小計 */}
       {selectedRow && (
         <div className="p-3 bg-gray-50 border rounded mb-4">
           小計：<b>{subtotal.toLocaleString()}</b> 元
         </div>
       )}
 
-      {/* 加入 */}
       <button
         onClick={addToList}
-        className="px-4 py-2 bg-blue-600 text-white rounded font-bold"
+        className="px-4 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700"
       >
         ＋ 加入成本明細表
       </button>
 
-      {/* 明細 */}
       <h3 className="mt-6 mb-2 text-lg font-bold">現場安裝明細</h3>
-
-      <table className="w-full border mb-4">
-        <thead className="bg-gray-100">
-          <tr>
-            <th className="border px-2 py-1">分類</th>
-            <th className="border px-2 py-1">規格</th>
-            <th className="border px-2 py-1">單位</th>
-            <th className="border px-2 py-1">數量</th>
-            <th className="border px-2 py-1">單價</th>
-            <th className="border px-2 py-1">小計</th>
-            <th className="border px-2 py-1">操作</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {items.map((i, idx) => {
-            const isEdit = editIndex === idx;
-
-            if (!isEdit) {
+      <div className="overflow-x-auto">
+        <table className="w-full border mb-4 text-sm">
+          <thead className="bg-gray-100">
+            <tr>
+              <th className="border px-2 py-1">設備</th>
+              <th className="border px-2 py-1">分類</th>
+              <th className="border px-2 py-1">規格</th>
+              <th className="border px-2 py-1">單位</th>
+              <th className="border px-2 py-1">數量</th>
+              <th className="border px-2 py-1">單價</th>
+              <th className="border px-2 py-1">小計</th>
+              <th className="border px-2 py-1">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((i, idx) => {
+              const isEdit = editIndex === idx;
+              if (isEdit) {
+                return (
+                  <tr key={idx} className="bg-yellow-50">
+                    <td className="border px-1 py-1">
+                      <input type="text" value={editItem.equipment} onChange={e=>setEditItem({...editItem, equipment: e.target.value})} className="border w-full p-1"/>
+                    </td>
+                    <td className="border px-2 py-1">{i.category}</td>
+                    <td className="border px-1 py-1">
+                      <select value={editItem.spec} onChange={e => onChangeSpec(e.target.value)} className="border rounded w-full p-1">
+                        {getSpecs(editItem.category).map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </td>
+                    <td className="border px-2 py-1">{editItem.unit}</td>
+                    <td className="border px-1 py-1">
+                      <input type="number" value={editItem.qty} onChange={e => setEditItem({ ...editItem, qty: e.target.value })} className="border w-20 p-1" />
+                    </td>
+                    <td className="border px-1 py-1">
+                      <input type="number" value={editItem.price} onChange={e => setEditItem({ ...editItem, price: e.target.value })} className="border w-24 p-1" />
+                    </td>
+                    <td className="border px-2 py-1 text-right">{(Number(editItem.qty) * Number(editItem.price)).toLocaleString()}</td>
+                    <td className="border px-2 py-1 text-center">
+                      <button onClick={() => saveEdit(idx)} className="text-green-600 font-bold mr-2">儲存</button>
+                      <button onClick={cancelEdit} className="text-gray-600 font-bold">取消</button>
+                    </td>
+                  </tr>
+                );
+              }
               return (
                 <tr key={idx}>
+                  <td className="border px-2 py-1">{i.equipment}</td>
                   <td className="border px-2 py-1">{i.category}</td>
                   <td className="border px-2 py-1">{i.spec}</td>
-                  <td className="border px-2 py-1">{i.unit}</td>
-                  <td className="border px-2 py-1">{i.qty}</td>
-                  <td className="border px-2 py-1">{i.price}</td>
-                  <td className="border px-2 py-1">{i.subtotal.toLocaleString()}</td>
-                  <td className="border px-2 py-1 space-x-2">
-                    <button
-                      onClick={() => startEdit(idx)}
-                      className="text-blue-600 font-bold"
-                    >
-                      編輯
-                    </button>
-                    <button
-                      onClick={() => deleteItem(idx)}
-                      className="text-red-600 font-bold"
-                    >
-                      刪除
-                    </button>
+                  <td className="border px-2 py-1 text-center">{i.unit}</td>
+                  <td className="border px-2 py-1 text-center">{i.qty}</td>
+                  <td className="border px-2 py-1 text-right">{i.price.toLocaleString()}</td>
+                  <td className="border px-2 py-1 text-right">{i.subtotal.toLocaleString()}</td>
+                  <td className="border px-2 py-1 text-center">
+                    <button onClick={() => startEdit(idx)} className="text-blue-600 font-bold mr-2">編輯</button>
+                    <button onClick={() => deleteItem(idx)} className="text-red-600 font-bold">刪除</button>
                   </td>
                 </tr>
               );
-            }
-
-            return (
-              <tr key={idx} className="bg-yellow-50">
-                <td className="border px-2 py-1">{i.category}</td>
-
-                <td className="border px-2 py-1">
-                  <select
-                    value={editItem.spec}
-                    onChange={e => onChangeSpec(e.target.value)}
-                    className="border px-1 py-1 rounded"
-                  >
-                    {getSpecs(editItem.category).map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                </td>
-
-                <td className="border px-2 py-1">{editItem.unit}</td>
-
-                <td className="border px-2 py-1">
-                  <input
-                    type="number"
-                    value={editItem.qty}
-                    onChange={e =>
-                      setEditItem({ ...editItem, qty: e.target.value })
-                    }
-                    className="border px-1 py-1 w-20"
-                  />
-                </td>
-
-                <td className="border px-2 py-1">
-                  <input
-                    type="number"
-                    value={editItem.price}
-                    onChange={e =>
-                      setEditItem({ ...editItem, price: e.target.value })
-                    }
-                    className="border px-1 py-1 w-24"
-                  />
-                </td>
-
-                <td className="border px-2 py-1">
-                  {(Number(editItem.qty) * Number(editItem.price)).toLocaleString()}
-                </td>
-
-                <td className="border px-2 py-1 space-x-2">
-                  <button
-                    onClick={() => saveEdit(idx)}
-                    className="text-green-600 font-bold"
-                  >
-                    儲存
-                  </button>
-                  <button
-                    onClick={cancelEdit}
-                    className="text-gray-600 font-bold"
-                  >
-                    取消
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
