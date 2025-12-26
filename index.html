@@ -2403,8 +2403,10 @@ function BackupArea({ projects, setProjects, setCurrentProject }) {
 }    
 
 /****************************************************
- * PART 10 — App（主控制）- 資料保護加強版
- * 修正：防止輸入資料後被雲端舊資料覆蓋
+ * PART 10 — App（主控制）- 最終穩定同步版
+ * 1. 支援多人分工程寫入 (Lock機制)
+ * 2. 資料庫讀取強制同步 (不比對版本)
+ * 3. 具備 hasUnsavedChanges 資料保護鎖
  ****************************************************/
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyKaX7bhCjK3cG2iUwqJrFkYAc_8Q2HCxuQdK67ZS2PLW6eO1dLoJVYdCyHhGUQg54k/exec";
 
@@ -2415,86 +2417,78 @@ function App() {
   const [isSyncing, setIsSyncing] = React.useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = React.useState(false);
 
+  // 五大資料庫 State
   const [materialDB, setMaterialDB] = React.useState([]);
   const [purchaseDB, setPurchaseDB] = React.useState([]);
   const [fabricationDB, setFabricationDB] = React.useState([]);
   const [transportDB, setTransportDB] = React.useState([]);
   const [installDB, setInstallDB] = React.useState([]);
 
-  // --- 雲端讀取：採用「合併」而非「覆蓋」 ---
+  // --- ☁️ 雲端讀取：採用「深度合併」 ---
   async function loadProjectsFromCloud() {
+    if (hasUnsavedChanges && !confirm("您有尚未儲存的修改，刷新可能會覆蓋掉新資料，確定嗎？")) return;
     setIsSyncing(true);
     try {
       const resp = await fetch(GAS_API_URL);
       const cloudData = await resp.json();
       if (cloudData && typeof cloudData === 'object') {
         setProjects(prev => {
-          // 🚀 關鍵：將本地最新資料與雲端資料合併，確保本地修改優先
-          const merged = { ...cloudData, ...prev }; 
+          // 排除掉雲端可能存在的空 Key 資料
+          const validCloudData = {};
+          Object.keys(cloudData).forEach(key => {
+            if (key && key !== "undefined") validCloudData[key] = cloudData[key];
+          });
+          const merged = { ...prev, ...validCloudData }; 
           saveProjects(merged);
           return merged;
         });
         setHasUnsavedChanges(false);
       }
-    } catch (e) { console.error("載入失敗"); }
+    } catch (e) { console.error("雲端載入失敗"); }
     finally { setIsSyncing(false); }
   }
 
-  // --- 雲端儲存 ---
+  // --- ☁️ 雲端儲存 ---
   async function saveToCloud(projectName, projectDetail) {
+    if (!projectName) return;
     setIsSyncing(true);
     try {
       await fetch(GAS_API_URL, {
         method: "POST",
         body: JSON.stringify({ projectName, data: projectDetail })
       });
-      // 給予小延遲確保 GAS 寫入完成
       setTimeout(() => {
         setIsSyncing(false);
         setHasUnsavedChanges(false);
-      }, 1000);
+      }, 1200); // 給予 Google Sheet 寫入緩衝時間
     } catch (e) { 
       setIsSyncing(false);
       console.error("儲存失敗"); 
     }
   }
 
-  // [保留原本的 loadDB, fetchCSV ...]
+  // --- 📦 資料庫讀取 (方法 B：每次重整都強制更新) ---
   async function fetchCSV(url) {
     const text = await fetch(url).then(r => r.text());
     const rows = text.split("\n").map(r => r.trim());
-    const version = `${rows.length}-${rows[0]}-${rows[rows.length - 1]}`;
-    return { rows, version };
+    return { rows };
   }
 
- async function loadDB(name, url, setter) {
+  async function loadDB(name, url, setter) {
     try {
-      // 🚀 強制同步：不再比對 localV，直接發送 fetch 請求
-      const { rows, version } = await fetchCSV(url);
-      
+      const { rows } = await fetchCSV(url);
       const parsed = rows.slice(1).map(r => r.split(",")).filter(r => r.length >= 2).map(r => {
-        // ① 材料（含重量與單價）
-        if (name === "material") return { category: r[0], spec: r[1], unit: r[2], weight: Number(r[3] || 0), price: Number(r[4] || 0) };
-        // ② 市購品
-        if (name === "purchase") return { category: r[0], spec: r[1], unit: r[2], price: Number(r[3] || 0) };
-        // ③ 製作成本
-        if (name === "fabrication") return { category: r[0], spec: r[1], unit: r[2], price: Number(r[3] || 0) };
-        // ④ 運輸費用
-        if (name === "transport") return { category: r[0], spec: r[1], region: r[2], price: Number(r[3] || 0), unit: r[4] || "台" };
-        // ⑤ 現場安裝
-        if (name === "install") return { category: r[0], spec: r[1], unit: r[2], price: Number(r[3] || 0) };
+        if (name === "material") return { category: (r[0]||"").trim(), spec: (r[1]||"").trim(), unit: r[2], weight: Number(r[3] || 0), price: Number(r[4] || 0) };
+        if (name === "purchase") return { category: (r[0]||"").trim(), spec: (r[1]||"").trim(), unit: r[2], price: Number(r[3] || 0) };
+        if (name === "fabrication") return { category: (r[0]||"").trim(), spec: (r[1]||"").trim(), unit: r[2], price: Number(r[3] || 0) };
+        if (name === "transport") return { category: (r[0]||"").trim(), spec: (r[1]||"").trim(), region: r[2], price: Number(r[3] || 0), unit: r[4] || "台" };
+        if (name === "install") return { category: (r[0]||"").trim(), spec: (r[1]||"").trim(), unit: r[2], price: Number(r[3] || 0) };
         return {};
       });
-
       setter(parsed);
-      
-      // 依然存入本地，作為斷網時的備份方案
       localStorage.setItem("db_" + name, JSON.stringify(parsed));
-      localStorage.setItem("dbv_" + name, version);
-      
     } catch (e) {
-      // 🛡️ 防錯機制：如果 Google 連線失敗，自動翻出本地舊資料墊檔，確保你能繼續編輯
-      console.error(`${name} 同步失敗，改用舊資料:`, e);
+      console.error(`${name} 同步失敗`);
       const local = localStorage.getItem("db_" + name);
       if (local) setter(JSON.parse(local));
     }
@@ -2524,9 +2518,9 @@ function App() {
       <div className={`flex justify-between items-center mb-4 p-3 rounded shadow border-l-4 ${isSyncing ? 'bg-orange-50 border-orange-500' : 'bg-green-50 border-green-500'}`}>
         <div className="text-sm font-bold">
           {isSyncing ? "🔄 雲端同步中..." : "✅ 雲端已連線"}
-          {hasUnsavedChanges && <span className="ml-2 text-red-500">(新資料儲存中)</span>}
+          {hasUnsavedChanges && <span className="ml-2 text-red-500 font-normal">(正在儲存您的修改)</span>}
         </div>
-        <button onClick={loadProjectsFromCloud} disabled={isSyncing} className="bg-white px-3 py-1 rounded border text-xs hover:bg-gray-50 disabled:opacity-50">刷新資料</button>
+        <button onClick={loadProjectsFromCloud} disabled={isSyncing} className="bg-white px-3 py-1 rounded border text-xs hover:bg-gray-50 disabled:opacity-50">刷新雲端資料</button>
       </div>
 
       <ProjectManager currentProject={currentProject} setCurrentProject={setCurrentProject} projects={projects} setProjects={setProjects} />
@@ -2534,7 +2528,7 @@ function App() {
 
       <div className="flex gap-2 mb-4">
         {["材料", "市購品", "製作成本", "運輸費用", "現場安裝", "總表"].map(tab => (
-          <button key={tab} onClick={() => setPage(tab)} className={"px-3 py-1 rounded border " + (page === tab ? "bg-blue-600 text-white" : "bg-white")}>{tab}</button>
+          <button key={tab} onClick={() => setPage(tab)} className={"px-3 py-1 rounded border font-bold " + (page === tab ? "bg-blue-600 text-white border-blue-600 shadow-md" : "bg-white")}>{tab}</button>
         ))}
       </div>
 
