@@ -258,8 +258,11 @@ function MaterialsPage({ materialDB, projectData, setProjectData }) {
   }, [category, materialDB]);
 
   const selectedRow = React.useMemo(() => {
-    return materialDB.find(r => r.category === category && r.spec === spec);
-  }, [category, spec, materialDB]);
+  return purchaseDB.find(r => 
+    r.category.trim() === category.trim() && 
+    r.spec.trim() === spec.trim()
+  );
+}, [category, spec, purchaseDB]);
 
   const unitWeight = selectedRow ? Number(selectedRow.weight) : 0;
   const price = selectedRow ? Number(selectedRow.price) : 0;
