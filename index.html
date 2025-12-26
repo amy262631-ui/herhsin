@@ -2457,24 +2457,36 @@ function App() {
     return { rows, version };
   }
 
-  async function loadDB(name, url, setter) {
-    const local = localStorage.getItem("db_" + name);
-    const localV = localStorage.getItem("dbv_" + name);
-    const { rows, version } = await fetchCSV(url);
-    if (local && localV === version) {
-      setter(JSON.parse(local));
-    } else {
+ async function loadDB(name, url, setter) {
+    try {
+      // 🚀 強制同步：不再比對 localV，直接發送 fetch 請求
+      const { rows, version } = await fetchCSV(url);
+      
       const parsed = rows.slice(1).map(r => r.split(",")).filter(r => r.length >= 2).map(r => {
+        // ① 材料（含重量與單價）
         if (name === "material") return { category: r[0], spec: r[1], unit: r[2], weight: Number(r[3] || 0), price: Number(r[4] || 0) };
+        // ② 市購品
         if (name === "purchase") return { category: r[0], spec: r[1], unit: r[2], price: Number(r[3] || 0) };
+        // ③ 製作成本
         if (name === "fabrication") return { category: r[0], spec: r[1], unit: r[2], price: Number(r[3] || 0) };
+        // ④ 運輸費用
         if (name === "transport") return { category: r[0], spec: r[1], region: r[2], price: Number(r[3] || 0), unit: r[4] || "台" };
+        // ⑤ 現場安裝
         if (name === "install") return { category: r[0], spec: r[1], unit: r[2], price: Number(r[3] || 0) };
         return {};
       });
+
       setter(parsed);
+      
+      // 依然存入本地，作為斷網時的備份方案
       localStorage.setItem("db_" + name, JSON.stringify(parsed));
       localStorage.setItem("dbv_" + name, version);
+      
+    } catch (e) {
+      // 🛡️ 防錯機制：如果 Google 連線失敗，自動翻出本地舊資料墊檔，確保你能繼續編輯
+      console.error(`${name} 同步失敗，改用舊資料:`, e);
+      const local = localStorage.getItem("db_" + name);
+      if (local) setter(JSON.parse(local));
     }
   }
 
