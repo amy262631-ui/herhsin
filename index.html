@@ -257,12 +257,14 @@ function MaterialsPage({ materialDB, projectData, setProjectData }) {
     return materialDB.filter(r => r.category === category).map(r => r.spec);
   }, [category, materialDB]);
 
-  const selectedRow = React.useMemo(() => {
-  return purchaseDB.find(r => 
-    r.category.trim() === category.trim() && 
-    r.spec.trim() === spec.trim()
-  );
-}, [category, spec, purchaseDB]);
+ const selectedRow = React.useMemo(() => {
+    // 🚀 關鍵修正：將 purchaseDB 改回 materialDB
+    // 並加入 .trim() 防止 Google Sheet 裡的空格導致匹配失敗
+    return materialDB.find(r => 
+      (r.category || "").trim() === (category || "").trim() && 
+      (r.spec || "").trim() === (spec || "").trim()
+    );
+  }, [category, spec, materialDB]);
 
   const unitWeight = selectedRow ? Number(selectedRow.weight) : 0;
   const price = selectedRow ? Number(selectedRow.price) : 0;
@@ -661,9 +663,14 @@ function PurchasePage({ purchaseDB, projectData, setProjectData }) {
       .map(r => r.spec);
   }, [category, purchaseDB]);
 
-  const selectedRow = React.useMemo(() => {
-    return purchaseDB.find(r => r.category === category && r.spec === spec);
-  }, [category, spec]);
+  /* --- 在 PurchasePage 組件內部尋找並替換 --- */
+const selectedRow = React.useMemo(() => {
+  // 加上 .trim() 與防空值處理
+  return purchaseDB.find(r => 
+    (r.category || "").trim() === (category || "").trim() && 
+    (r.spec || "").trim() === (spec || "").trim()
+  );
+}, [category, spec, purchaseDB]);
 
   const price = selectedRow ? Number(selectedRow.price) : 0;
   const subtotal = price * Number(qty || 0);
