@@ -2376,7 +2376,15 @@ function App() {
 
   async function loadDB(name, url, setter) {
     try {
-      const { rows } = await fetchCSV(url);
+      // 🚀 加上快取清除參數，防止 Google 回傳舊的 400 錯誤
+      const finalUrl = url + "&t=" + new Date().getTime();
+      const response = await fetch(finalUrl);
+      
+      if (!response.ok) throw new Error("網路回應不正常");
+      
+      const text = await response.text();
+      const rows = text.split("\n").map(r => r.trim());
+      
       const parsed = rows.slice(1).map(r => r.split(",")).filter(r => r.length >= 2).map(r => {
         if (name === "material") return { category: (r[0]||"").trim(), spec: (r[1]||"").trim(), unit: r[2], weight: Number(r[3] || 0), price: Number(r[4] || 0) };
         if (name === "purchase") return { category: (r[0]||"").trim(), spec: (r[1]||"").trim(), unit: r[2], price: Number(r[3] || 0) };
@@ -2388,7 +2396,7 @@ function App() {
       setter(parsed);
       localStorage.setItem("db_" + name, JSON.stringify(parsed));
     } catch (e) {
-      console.error(`${name} 同步失敗`);
+      console.warn(`${name} 資料庫加載失敗，改用本地暫存`, e);
       const local = localStorage.getItem("db_" + name);
       if (local) setter(JSON.parse(local));
     }
