@@ -1627,29 +1627,29 @@ function TransportPage({ transportDB, projectData, setProjectData }) {
 }
 /****************************************************
  * PART 8 — InstallPage（現場安裝）
+ * - 修復列內編輯無法輸入問題
  * - 支援設備名稱、自動抓單價
- * - 修復 ReferenceError 問題
  ****************************************************/
 function InstallPage({ installDB, projectData, setProjectData }) {
   const [category, setCategory] = React.useState("");
   const [spec, setSpec] = React.useState("");
   const [qty, setQty] = React.useState("");
-  const [equipName, setEquipName] = React.useState(""); // 🚀 補上這行：定義設備名稱
+  const [equipName, setEquipName] = React.useState(""); 
 
   const [editIndex, setEditIndex] = React.useState(null);
   const [editItem, setEditItem] = React.useState(null);
 
   /***************** 工具函式 *****************/
-  function getSpecs(category) {
+  function getSpecs(cat) {
     return installDB
-      .filter(r => (r.category || "").trim() === category.trim())
+      .filter(r => (r.category || "").trim() === (cat || "").trim())
       .map(r => r.spec);
   }
 
-  function findDBRow(category, spec) {
+  function findDBRow(cat, sp) {
     return installDB.find(r => 
-      (r.category || "").trim() === (category || "").trim() && 
-      (r.spec || "").trim() === (spec || "").trim()
+      (r.category || "").trim() === (cat || "").trim() && 
+      (r.spec || "").trim() === (sp || "").trim()
     );
   }
 
@@ -1662,19 +1662,16 @@ function InstallPage({ installDB, projectData, setProjectData }) {
   const subtotal = price * Number(qty || 0);
 
   function addToList() {
-    // 1. 基本防呆
     if (!category || !spec || !qty) {
       alert("請選擇分類、規格並輸入數量");
       return;
     }
-
-    // 2. 獲取單價與單位
     const currentPrice = selectedRow ? Number(selectedRow.price) : 0;
     const currentUnit = selectedRow ? (selectedRow.unit || "") : "";
 
     const item = {
       type: "現場安裝",
-      equipment: (equipName || "").trim(), // 🚀 現在 equipName 已定義，不會再報錯
+      equipment: (equipName || "").trim(),
       category: category.trim(),
       spec: spec.trim(),
       unit: currentUnit.trim(),
@@ -1683,92 +1680,138 @@ function InstallPage({ installDB, projectData, setProjectData }) {
       subtotal: Number(qty) * currentPrice
     };
 
-    // 3. 執行更新（這會觸發 App 的 updateProjectData 與 saveToCloud）
     setProjectData({
       ...projectData,
       allItems: [...(projectData.allItems || []), item]
     });
 
-    // 4. 清空輸入框
     setSpec("");
     setQty("");
-    setEquipName(""); // 🚀 清空設備名稱
+    setEquipName("");
   }
 
+  // 取得目前工程中所有的現場安裝項目
   const items = (projectData.allItems || []).filter(i => i.type === "現場安裝");
 
-  /***************** 編輯模式 (略過，邏輯已包含在下方 UI) *****************/
+  /***************** 編輯邏輯 *****************/
   function startEdit(idx) {
     const item = items[idx];
     setEditIndex(idx);
-    setEditItem({ ...item });
+    setEditItem({ ...item }); // 複製一份到編輯狀態
   }
+
   function saveEdit(idx) {
-    const old = items[idx];
-    const realIndex = projectData.allItems.indexOf(old);
+    const oldItem = items[idx];
+    // 找出這筆資料在原始總陣列中的真正位置
+    const realIndex = projectData.allItems.indexOf(oldItem);
+    
     const updatedItem = {
       ...editItem,
+      qty: Number(editItem.qty),
+      price: Number(editItem.price),
       subtotal: Number(editItem.qty) * Number(editItem.price)
     };
+
     const newAll = [...projectData.allItems];
     newAll[realIndex] = updatedItem;
+    
     setProjectData({ ...projectData, allItems: newAll });
     setEditIndex(null);
+    setEditItem(null);
   }
 
   return (
     <div className="p-4 bg-white rounded shadow">
-      <h2 className="text-xl font-bold mb-4">現場安裝</h2>
-      <div className="mb-3">
-        <label className="font-bold">設備名稱：</label>
-        <input type="text" value={equipName} onChange={e => setEquipName(e.target.value)} className="border px-2 py-1 rounded ml-2 w-48" placeholder="可留白" />
-      </div>
-      <div className="mb-3">
-        <label className="font-bold">分類：</label>
-        <select value={category} onChange={e => { setCategory(e.target.value); setSpec(""); }} className="border px-2 py-1 rounded ml-2">
-          <option value="">請選擇</option>
-          {[...new Set(installDB.map(r => r.category))].map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-      </div>
-      {category && (
-        <div className="mb-3">
-          <label className="font-bold">規格：</label>
-          <select value={spec} onChange={e => setSpec(e.target.value)} className="border px-2 py-1 rounded ml-2">
-            <option value="">請選擇規格</option>
-            {getSpecs(category).map(s => <option key={s} value={s}>{s}</option>)}
+      <h2 className="text-xl font-bold mb-4 border-b-2 border-purple-200 pb-2">現場安裝</h2>
+      
+      {/* 新增區域 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 bg-purple-50 p-3 rounded">
+        <div>
+          <label className="font-bold block text-sm">設備名稱：</label>
+          <input type="text" value={equipName} onChange={e => setEquipName(e.target.value)} className="border px-2 py-1 rounded w-full" placeholder="例如：主機架" />
+        </div>
+        <div>
+          <label className="font-bold block text-sm">分類：</label>
+          <select value={category} onChange={e => { setCategory(e.target.value); setSpec(""); }} className="border px-2 py-1 rounded w-full">
+            <option value="">請選擇</option>
+            {[...new Set(installDB.map(r => r.category))].map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
-      )}
+        {category && (
+          <div>
+            <label className="font-bold block text-sm">規格：</label>
+            <select value={spec} onChange={e => setSpec(e.target.value)} className="border px-2 py-1 rounded w-full">
+              <option value="">請選擇規格</option>
+              {getSpecs(category).map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+        )}
+        {selectedRow && (
+          <div>
+            <label className="font-bold block text-sm">數量 ({selectedRow.unit})：</label>
+            <div className="flex gap-2">
+              <input type="number" value={qty} onChange={e => setQty(e.target.value)} className="border px-2 py-1 rounded w-full" />
+              <button onClick={addToList} className="whitespace-nowrap px-4 py-1 bg-purple-600 text-white rounded font-bold hover:bg-purple-700">＋ 加入</button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {selectedRow && (
-        <div className="mb-3 p-3 bg-gray-50 border rounded">
-          <p>單位：{selectedRow.unit} ／ 單價：<b>{selectedRow.price}</b></p>
-          <label className="font-bold">數量：</label>
-          <input type="number" value={qty} onChange={e => setQty(e.target.value)} className="border px-2 py-1 rounded ml-2 w-32" />
-          <p className="mt-2">小計：<b>{subtotal.toLocaleString()}</b> 元</p>
+        <div className="mb-4 text-sm text-purple-700 font-bold bg-white p-2 border border-purple-200 rounded">
+          單價：{selectedRow.price} 元 ／ 小計：{subtotal.toLocaleString()} 元
         </div>
       )}
-      <button onClick={addToList} className="px-4 py-2 bg-blue-600 text-white rounded font-bold">＋ 加入成本明細表</button>
 
-      <table className="w-full border mt-6 text-sm">
-        <thead className="bg-gray-100"><tr><th>設備</th><th>項目</th><th>數量</th><th>小計</th><th>操作</th></tr></thead>
-        <tbody>
-          {items.map((i, idx) => (
-            <tr key={idx}>
-              <td className="border p-1">{i.equipment}</td>
-              <td className="border p-1">{i.spec}</td>
-              <td className="border p-1 text-center">{i.qty}</td>
-              <td className="border p-1 text-right">{i.subtotal.toLocaleString()}</td>
-              <td className="border p-1 text-center">
-                <button onClick={() => i === editItem ? saveEdit(idx) : startEdit(idx)} className="text-blue-600 mr-2">編輯</button>
-                <button onClick={() => { if(confirm("刪除？")){ const newAll = projectData.allItems.filter(it => it !== i); setProjectData({...projectData, allItems: newAll}); }}} className="text-red-600">刪除</button>
-              </td>
+      {/* 明細表格 */}
+      <div className="overflow-x-auto">
+        <table className="w-full border text-sm">
+          <thead className="bg-gray-100">
+            <tr>
+              <th className="border p-2 w-1/4">設備</th>
+              <th className="border p-2 w-1/4">項目</th>
+              <th className="border p-2 w-1/6">數量</th>
+              <th className="border p-2 w-1/6">小計</th>
+              <th className="border p-2 w-1/6">操作</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-      <div className="mt-4 p-3 bg-gray-50 border-t-2 border-purple-500 rounded text-right">
+          </thead>
+          <tbody>
+            {items.map((i, idx) => {
+              const isEditing = editIndex === idx;
+              return (
+                <tr key={idx} className={isEditing ? "bg-yellow-50" : ""}>
+                  <td className="border p-1">
+                    {isEditing ? (
+                      <input className="w-full border p-1" value={editItem.equipment} onChange={e => setEditItem({...editItem, equipment: e.target.value})} />
+                    ) : i.equipment}
+                  </td>
+                  <td className="border p-1">{i.spec}</td>
+                  <td className="border p-1 text-center">
+                    {isEditing ? (
+                      <input type="number" className="w-full border p-1 text-center" value={editItem.qty} onChange={e => setEditItem({...editItem, qty: e.target.value})} />
+                    ) : i.qty}
+                  </td>
+                  <td className="border p-1 text-right">
+                    {isEditing ? (Number(editItem.qty) * Number(editItem.price)).toLocaleString() : i.subtotal.toLocaleString()}
+                  </td>
+                  <td className="border p-1 text-center">
+                    {isEditing ? (
+                      <button onClick={() => saveEdit(idx)} className="text-green-600 font-bold mr-2">💾 儲存</button>
+                    ) : (
+                      <button onClick={() => startEdit(idx)} className="text-blue-600 mr-2">編輯</button>
+                    )}
+                    <button onClick={() => { if(confirm("確定刪除此項現場安裝費用？")){ const newAll = projectData.allItems.filter(it => it !== i); setProjectData({...projectData, allItems: newAll}); }}} className="text-red-600">刪除</button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="mt-4 p-3 bg-purple-50 border-t-2 border-purple-500 rounded text-right">
         <div className="text-lg font-bold text-purple-700">
-          現場安裝總金額合計：{formatMoney(items.reduce((sum, i) => sum + (i.subtotal || 0), 0))} 元
+          現場安裝總金額合計：{items.reduce((sum, i) => sum + (i.subtotal || 0), 0).toLocaleString()} 元
         </div>
       </div>
     </div>
