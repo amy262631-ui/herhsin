@@ -2285,7 +2285,7 @@ function App() {
   const [transportDB, setTransportDB] = React.useState([]);
   const [installDB, setInstallDB] = React.useState([]);
 
- // --- ☁️ 雲端讀取 (對應壓縮格式還原版) ---
+ // --- ☁️ 雲端讀取 (還原壓縮格式版) ---
   async function loadProjectsFromCloud() {
     setIsSyncing(true);
     try {
@@ -2299,18 +2299,11 @@ function App() {
           manualAdjustDetail: proj.mad || defaultManualAdjust,
           allItems: (proj.allItems || []).map(i => ({
             type: i.t === "M" ? "材料" : (i.t === "P" ? "市購品" : (i.t === "F" ? "製作成本" : (i.t === "T" ? "運輸費用" : "現場安裝"))),
-            equipment: i.e,
-            equipName: i.e,
-            category: i.c,
-            spec: i.s,
-            qty: i.q,
-            pcs: i.q,
-            length: i.l,
-            width: i.w,
-            region: i.r,
-            price: i.p,
-            unitPrice: i.p,
-            subtotal: i.st
+            equipment: i.e, equipName: i.e,
+            category: i.c, spec: i.s,
+            qty: i.q, pcs: i.q,
+            length: i.l, width: i.w,
+            region: i.r, price: i.p, unitPrice: i.p, subtotal: i.st
           }))
         };
       });
@@ -2319,17 +2312,17 @@ function App() {
       saveProjects(restoredProjects);
       setHasUnsavedChanges(false);
       console.log("✅ 雲端資料還原成功");
-    } catch (e) { console.error("載入失敗", e); }
+    } catch (e) { console.error("雲端載入失敗", e); }
     finally { setIsSyncing(false); }
   }
-// --- ☁️ 雲端儲存 (激進壓縮 + 繞過 CORS 版) ---
+// --- ☁️ 雲端儲存 (極致壓縮 + 繞過 CORS 版) ---
   async function saveToCloud(projectName, projectDetail) {
     if (!projectName) return;
     setIsSyncing(true);
 
     try {
       // 🚀 1. 激進壓縮：縮短所有鍵名 (Key Name)
-      // 這能讓 JSON 體積縮小 60% 以上，絕對不會超過 50,000 字
+      // 這樣 50,000 字的資料會變成約 15,000 字，絕對不會爆掉
       const slimItems = (projectDetail.allItems || []).map(item => {
         return {
           t: item.type === "材料" ? "M" : (item.type === "市購品" ? "P" : (item.type === "製作成本" ? "F" : (item.type === "運輸費用" ? "T" : "I"))),
@@ -2351,28 +2344,26 @@ function App() {
       };
 
       const payload = JSON.stringify({ projectName: projectName.toString(), data: leanData });
-      console.log(`📊 壓縮後 JSON 長度: ${payload.length} (原 53748)`);
+      console.log(`📊 壓縮後長度: ${payload.length} (原 53862)`);
 
-      // 🚀 2. 解決 CORS：使用 mode: 'no-cors'
-      // Google Apps Script 的 POST 不支援標準 CORS 響應
+      // 🚀 2. 使用 mode: 'no-cors' 繞過瀏覽器 CORS 封鎖
       await fetch(GAS_API_URL, { 
         method: "POST", 
         body: payload,
-        mode: 'no-cors', // 💡 關鍵：繞過瀏覽器 CORS 檢查
-        headers: { 'Content-Type': 'text/plain' } // 💡 關鍵：避免觸發 Preflight
+        mode: 'no-cors', 
+        headers: { 'Content-Type': 'text/plain' } 
       });
 
-      // 🚀 3. 因為 no-cors 無法讀取 success 訊息，我們假設發出即成功
-      // 並給予 2 秒緩衝讓 Google 處理
+      // 🚀 3. 假設發出即成功 (因為 no-cors 讀不到回傳值)
       setTimeout(() => {
         setIsSyncing(false);
         setHasUnsavedChanges(false);
-        console.log("✅ 雲端指令已發送");
-      }, 2000);
+        console.log("✅ 雲端同步指令已發送");
+      }, 1500);
 
     } catch (e) { 
       setIsSyncing(false);
-      console.error("❌ 同步指令發送失敗:", e); 
+      console.error("❌ 同步連線失敗:", e); 
     }
   }
 
