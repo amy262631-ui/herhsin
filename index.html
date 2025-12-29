@@ -2289,15 +2289,16 @@ function App() {
   async function loadProjectsFromCloud() {
     setIsSyncing(true);
     try {
-      // 🚀 加上時間戳防止快取錯誤紀錄，並明確設定 cors 模式
+      // 🚀 加上時間戳 t=... 防止瀏覽器快取舊的 CORS 錯誤紀錄
       const finalUrl = GAS_API_URL + (GAS_API_URL.includes('?') ? '&' : '?') + "t=" + new Date().getTime();
       
       const resp = await fetch(finalUrl, {
         method: "GET",
-        mode: "cors" // 💡 明確要求 CORS
+        cache: 'no-cache', // 💡 強制不使用快取
+        mode: 'cors'      // 💡 明確要求 CORS 模式
       });
 
-      if (!resp.ok) throw new Error("網路回應不正常");
+      if (!resp.ok) throw new Error("網路回應錯誤");
       
       const rawCloudData = await resp.json();
       const restoredProjects = {};
@@ -2328,7 +2329,6 @@ function App() {
 
     } catch (e) { 
       console.error("❌ 雲端載入失敗:", e); 
-      // 如果載入失敗，畫面會維持 LocalStorage 的資料
     } finally { 
       setIsSyncing(false); 
     }
