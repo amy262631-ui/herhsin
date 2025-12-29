@@ -2277,6 +2277,8 @@ function App() {
   const [page, setPage] = React.useState("材料");
   const [isSyncing, setIsSyncing] = React.useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = React.useState(false);
+  const [currentByteCount, setCurrentByteCount] = React.useState(0);
+  const [storageUsage, setStorageUsage] = React.useState(0);
 
   // 五大資料庫 State
   const [materialDB, setMaterialDB] = React.useState([]);
@@ -2325,58 +2327,68 @@ allItems: (proj.allItems || []).map(i => {
   } catch (e) { console.error("雲端載入失敗", e); }
   finally { setIsSyncing(false); }
 }
-// --- ☁️ 雲端儲存 (極致壓縮 + 繞過 CORS 版) ---
-  async function saveToCloud(projectName, projectDetail) {
-    if (!projectName) return;
-    setIsSyncing(true);
+// --- ☁️ 雲端儲存 (極致壓縮 + 字數預警版) ---
+async function saveToCloud(projectName, projectDetail) {
+  if (!projectName) return;
+  setIsSyncing(true);
 
-    try {
-      // 🚀 修改存檔對應邏輯
-const slimItems = (projectDetail.allItems || []).map(item => {
-  return {
-    t: item.type === "材料" ? "M" : (item.type === "市購品" ? "P" : (item.type === "製作成本" ? "F" : (item.type === "運輸費用" ? "T" : "I"))),
-    e: (item.equipName || item.equipment || "").trim(),
-    c: (item.category || "").trim(),
-    s: (item.spec || "").trim(),
-    q: Number(item.qty || item.pcs || 0),
-    l: Number(item.length || 0),
-    w: Number(item.width || 0),   // 這裡的 w 固定給「寬度」
-    wg: Number(item.weight || 0), // 🚀 新增 wg 固定給「重量」
-    r: (item.region || "").trim(),
-    p: Number(item.price || item.unitPrice || 0),
-    st: Number(item.subtotal || 0)
-  };
-});
-
-      const leanData = {
-        allItems: slimItems,
-        mad: projectDetail.manualAdjustDetail || {}
+  try {
+    const slimItems = (projectDetail.allItems || []).map(item => {
+      return {
+        t: item.type === "材料" ? "M" : (item.type === "市購品" ? "P" : (item.type === "製作成本" ? "F" : (item.type === "運輸費用" ? "T" : "I"))),
+        e: (item.equipName || item.equipment || "").trim(),
+        c: (item.category || "").trim(),
+        s: (item.spec || "").trim(),
+        q: Number(item.qty || item.pcs || 0),
+        l: Number(item.length || 0),
+        w: Number(item.width || 0),
+        wg: Number(item.weight || 0),
+        r: (item.region || "").trim(),
+        p: Number(item.price || item.unitPrice || 0),
+        st: Number(item.subtotal || 0)
       };
+    });
 
-      const payload = JSON.stringify({ projectName: projectName.toString(), data: leanData });
-      console.log(`📊 壓縮後長度: ${payload.length} (原 53862)`);
+    const leanData = {
+      allItems: slimItems,
+      mad: projectDetail.manualAdjustDetail || {}
+    };
 
-      // 🚀 2. 使用 mode: 'no-cors' 繞過瀏覽器 CORS 封鎖
-      await fetch(GAS_API_URL, { 
-        method: "POST", 
-        body: payload,
-        mode: 'no-cors', 
-        headers: { 'Content-Type': 'text/plain' } 
-      });
+    const payload = JSON.stringify({ projectName: projectName.toString(), data: leanData });
+    
+    // 🚀 核心預警邏輯
+    const byteCount = payload.length;
+    const usagePercent = Math.round((byteCount / 50000) * 100);
+    
+    // 更新狀態（請確保您在 App 內定義了這兩個 State，見下方第 2 點）
+    setCurrentByteCount(byteCount);
+    setStorageUsage(usagePercent);
 
-      // 🚀 3. 假設發出即成功 (因為 no-cors 讀不到回傳值)
-      setTimeout(() => {
-        setIsSyncing(false);
-        setHasUnsavedChanges(false);
-        console.log("✅ 雲端同步指令已發送");
-      }, 1500);
+    console.log(`📊 壓縮後長度: ${byteCount} 字 / 使用率: ${usagePercent}%`);
 
-    } catch (e) { 
-      setIsSyncing(false);
-      console.error("❌ 同步連線失敗:", e); 
+    // 🚩 若超過 95% 彈出強烈警告
+    if (byteCount > 47500) {
+      alert(`⚠️ 警告！該工程資料量已達 ${byteCount} 字 (${usagePercent}%)。已接近 Google 50,000 字上限，請考慮拆分工程名稱儲存！`);
     }
-  }
 
+    await fetch(GAS_API_URL, { 
+      method: "POST", 
+      body: payload,
+      mode: 'no-cors', 
+      headers: { 'Content-Type': 'text/plain' } 
+    });
+
+    setTimeout(() => {
+      setIsSyncing(false);
+      setHasUnsavedChanges(false);
+      console.log("✅ 雲端同步指令已發送");
+    }, 1500);
+
+  } catch (e) { 
+    setIsSyncing(false);
+    console.error("❌ 同步連線失敗:", e); 
+  }
+}
   // --- 📦 資料庫讀取 (方法 B：每次重整都強制更新) ---
   async function fetchCSV(url) {
     const text = await fetch(url).then(r => r.text());
@@ -2446,11 +2458,34 @@ const slimItems = (projectDetail.allItems || []).map(item => {
   return (
     <div className="p-4 max-w-5xl mx-auto">
       <div className={`flex justify-between items-center mb-4 p-3 rounded shadow border-l-4 ${isSyncing ? 'bg-orange-50 border-orange-500' : 'bg-green-50 border-green-500'}`}>
-        <div className="text-sm font-bold">
-          {isSyncing ? "🔄 雲端同步中..." : "✅ 雲端已連線"}
-          {hasUnsavedChanges && <span className="ml-2 text-red-500 font-normal">(正在儲存您的修改)</span>}
-        </div>
-        <button onClick={loadProjectsFromCloud} disabled={isSyncing} className="bg-white px-3 py-1 rounded border text-xs hover:bg-gray-50 disabled:opacity-50">刷新雲端資料</button>
+  <div className="flex items-center gap-3">
+    {/* 1. 連線狀態文字 */}
+    <div className="text-sm font-bold">
+      {isSyncing ? "🔄 雲端同步中..." : "✅ 雲端已連線"}
+      {hasUnsavedChanges && <span className="ml-2 text-red-500 font-normal">(正在儲存您的修改)</span>}
+    </div>
+
+    {/* 🚀 2. 新增：字數預警指示器 (僅在有字數時顯示) */}
+    {currentByteCount > 0 && (
+      <div className={`px-2 py-0.5 rounded text-[10px] font-mono border transition-all ${
+        storageUsage > 90 ? 'bg-red-500 text-white animate-bounce border-red-700' : 
+        storageUsage > 70 ? 'bg-yellow-400 text-black border-yellow-600' : 
+        'bg-gray-100 text-gray-600 border-gray-300'
+      }`}>
+        📦 容量: {storageUsage}% ({currentByteCount} / 50,000)
+      </div>
+    )}
+  </div>
+
+  {/* 3. 刷新按鈕 */}
+  <button 
+    onClick={loadProjectsFromCloud} 
+    disabled={isSyncing} 
+    className="bg-white px-3 py-1 rounded border text-xs hover:bg-gray-50 disabled:opacity-50 shadow-sm"
+  >
+    刷新雲端資料
+  </button>
+</div>
       </div>
 
       <ProjectManager currentProject={currentProject} setCurrentProject={setCurrentProject} projects={projects} setProjects={setProjects} />
