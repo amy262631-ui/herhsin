@@ -2298,28 +2298,22 @@ async function loadProjectsFromCloud() {
       const proj = rawCloudData[name];
       restoredProjects[name] = {
         manualAdjustDetail: proj.mad || { ...defaultManualAdjust },
-        allItems: (proj.allItems || []).map(i => {
-          const typeMap = { "M": "材料", "P": "市購品", "F": "製作成本", "T": "運輸費用", "I": "現場安裝" };
-          
-          // 🚀 關鍵修復點：確保讀取壓縮後的欄位 'i.w' 並轉回 'weight'
-          return {
-            type: typeMap[i.t] || "材料",
-            equipment: i.e || "",
-            equipName: i.e || "",
-            category: i.c || "",
-            spec: i.s || "",
-            qty: Number(i.q || 0),
-            pcs: Number(i.q || 0),
-            length: Number(i.l || 0),
-            width: Number(i.w || 0),
-            region: i.r || "",
-            price: Number(i.p || 0),
-            unitPrice: Number(i.p || 0),
-            // 💡 修正這裡：優先讀取 i.weight，若無則讀取壓縮標籤 i.w
-            weight: Number(i.weight !== undefined ? i.weight : (i.w || 0)), 
-            subtotal: Number(i.subtotal !== undefined ? i.subtotal : (i.st || 0))
-          };
-        })
+        // 🚀 修改 loadProjectsFromCloud 內的還原邏輯
+allItems: (proj.allItems || []).map(i => {
+  const typeMap = { "M": "材料", "P": "市購品", "F": "製作成本", "T": "運輸費用", "I": "現場安裝" };
+  return {
+    type: typeMap[i.t] || "材料",
+    equipment: i.e || "", equipName: i.e || "",
+    category: i.c || "", spec: i.s || "",
+    qty: Number(i.q || 0), pcs: Number(i.q || 0),
+    length: Number(i.l || 0),
+    width: Number(i.w || 0), // 還原寬度
+    weight: Number(i.wg || i.weight || 0), // 🚀 優先讀取 wg，相容舊版 weight
+    region: i.r || "",
+    price: Number(i.p || 0), unitPrice: Number(i.p || 0),
+    subtotal: Number(i.st || 0)
+  };
+})
       };
     });
 
@@ -2336,22 +2330,22 @@ async function loadProjectsFromCloud() {
     setIsSyncing(true);
 
     try {
-      // 🚀 1. 激進壓縮：縮短所有鍵名 (Key Name)
-      // 這樣 50,000 字的資料會變成約 15,000 字，絕對不會爆掉
-      const slimItems = (projectDetail.allItems || []).map(item => {
-        return {
-          t: item.type === "材料" ? "M" : (item.type === "市購品" ? "P" : (item.type === "製作成本" ? "F" : (item.type === "運輸費用" ? "T" : "I"))),
-          e: (item.equipName || item.equipment || "").trim(),
-          c: (item.category || "").trim(),
-          s: (item.spec || "").trim(),
-          q: Number(item.qty || item.pcs || 0),
-          l: Number(item.length || 0),
-          w: Number(item.width || 0),
-          r: (item.region || "").trim(),
-          p: Number(item.price || item.unitPrice || 0),
-          st: Number(item.subtotal || 0)
-        };
-      });
+      // 🚀 修改 saveToCloud 內的 slimItems 對應
+const slimItems = (projectDetail.allItems || []).map(item => {
+  return {
+    t: item.type === "材料" ? "M" : (item.type === "市購品" ? "P" : (item.type === "製作成本" ? "F" : (item.type === "運輸費用" ? "T" : "I"))),
+    e: (item.equipName || item.equipment || "").trim(),
+    c: (item.category || "").trim(),
+    s: (item.spec || "").trim(),
+    q: Number(item.qty || item.pcs || 0),
+    l: Number(item.length || 0),
+    w: Number(item.width || 0),  // 這裡的 w 是寬度
+    wg: Number(item.weight || 0), // 🚀 新增：wg 代表重量 (Weight)
+    r: (item.region || "").trim(),
+    p: Number(item.price || item.unitPrice || 0),
+    st: Number(item.subtotal || 0)
+  };
+});
 
       const leanData = {
         allItems: slimItems,
