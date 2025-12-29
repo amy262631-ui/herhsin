@@ -2183,23 +2183,25 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
         </div>
 
         {/* 🚀 建議售價 + 預計利潤 並排區塊 */}
-        <div className="mt-6 p-4 bg-gray-50 border-2 border-red-500 rounded flex justify-between items-end flex-wrap gap-4">
-          {/* 左邊：建議售價 */}
-          <div>
-            <div className="text-red-500 text-sm font-bold mb-1">建議售價</div>
-            <div className="text-red-600 font-bold text-2xl">
-              {Math.round(finalTotalWithMargin).toLocaleString()} <span className="text-sm">元</span>
-            </div>
-          </div>
+       <div className="mt-6 p-4 bg-gray-50 border-2 border-red-500 rounded flex justify-between items-end flex-wrap gap-4">
+  {/* 左邊：建議售價 */}
+  <div>
+    <div className="text-red-500 text-sm font-bold mb-1">建議售價</div>
+    <div className="text-red-600 font-bold text-2xl">
+      {/* 🚀 修正點 1: 改回 suggestPrice */}
+      {suggestPrice.toLocaleString()} <span className="text-sm">元</span>
+    </div>
+  </div>
 
-          {/* 右邊：預計利潤 */}
-          <div className="text-right">
-            <div className="text-green-600 text-sm font-bold mb-1">預計利潤</div>
-            <div className="text-green-600 font-bold text-xl border-b-2 border-green-200 pb-1">
-              {Math.round(expectedProfit).toLocaleString()} <span className="text-sm text-gray-500">元</span>
-            </div>
-          </div>
-        </div>
+  {/* 右邊：預計利潤 */}
+  <div className="text-right">
+    <div className="text-green-600 text-sm font-bold mb-1">預計利潤</div>
+    <div className="text-green-600 font-bold text-xl border-b-2 border-green-200 pb-1">
+      {/* 🚀 修正點 2: 改回 profitAmount */}
+      {profitAmount.toLocaleString()} <span className="text-sm text-gray-500">元</span>
+    </div>
+  </div>
+</div>
       </div>
 
       {/* 匯出 Excel + 列印 */}
