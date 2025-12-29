@@ -2298,7 +2298,7 @@ async function loadProjectsFromCloud() {
       const proj = rawCloudData[name];
       restoredProjects[name] = {
         manualAdjustDetail: proj.mad || { ...defaultManualAdjust },
-        // 🚀 修改 loadProjectsFromCloud 內的還原邏輯
+        // 🚀 修改還原對應邏輯
 allItems: (proj.allItems || []).map(i => {
   const typeMap = { "M": "材料", "P": "市購品", "F": "製作成本", "T": "運輸費用", "I": "現場安裝" };
   return {
@@ -2308,7 +2308,8 @@ allItems: (proj.allItems || []).map(i => {
     qty: Number(i.q || 0), pcs: Number(i.q || 0),
     length: Number(i.l || 0),
     width: Number(i.w || 0), // 還原寬度
-    weight: Number(i.wg || i.weight || 0), // 🚀 優先讀取 wg，相容舊版 weight
+    // 🚀 修改點：優先讀取 wg，如果沒有才找舊的 weight，都沒有就給 0
+    weight: Number(i.wg || i.weight || 0), 
     region: i.r || "",
     price: Number(i.p || 0), unitPrice: Number(i.p || 0),
     subtotal: Number(i.st || 0)
@@ -2330,7 +2331,7 @@ allItems: (proj.allItems || []).map(i => {
     setIsSyncing(true);
 
     try {
-      // 🚀 修改 saveToCloud 內的 slimItems 對應
+      // 🚀 修改存檔對應邏輯
 const slimItems = (projectDetail.allItems || []).map(item => {
   return {
     t: item.type === "材料" ? "M" : (item.type === "市購品" ? "P" : (item.type === "製作成本" ? "F" : (item.type === "運輸費用" ? "T" : "I"))),
@@ -2339,8 +2340,8 @@ const slimItems = (projectDetail.allItems || []).map(item => {
     s: (item.spec || "").trim(),
     q: Number(item.qty || item.pcs || 0),
     l: Number(item.length || 0),
-    w: Number(item.width || 0),  // 這裡的 w 是寬度
-    wg: Number(item.weight || 0), // 🚀 新增：wg 代表重量 (Weight)
+    w: Number(item.width || 0),   // 這裡的 w 固定給「寬度」
+    wg: Number(item.weight || 0), // 🚀 新增 wg 固定給「重量」
     r: (item.region || "").trim(),
     p: Number(item.price || item.unitPrice || 0),
     st: Number(item.subtotal || 0)
