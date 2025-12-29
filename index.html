@@ -2309,50 +2309,47 @@ function App() {
     finally { setIsSyncing(false); }
   }
 
-// --- ☁️ 雲端儲存 (極致瘦身穩定版 + 錯誤診斷) ---
+// --- ☁️ 雲端儲存 (極致瘦身穩定版) ---
   async function saveToCloud(projectName, projectDetail) {
     if (!projectName) return;
-    
-    // 🚀 1. 立即標記為同步中
     setIsSyncing(true);
-    console.log("🚀 開始同步工程:", projectName);
-
     try {
-      // 🚀 2. 資料瘦身：剔除所有項目的 specs 陣列
+      // 🚀 核心優化：移除所有項目的 specs 陣列
+      // specs 是從資料庫抓取的選單資料，存入雲端完全是浪費空間
       const leanDetail = {
         ...projectDetail,
         allItems: (projectDetail.allItems || []).map(item => {
+          // 使用解構賦值，把 specs 拿掉，剩下的欄位 (...rest) 才存檔
           const { specs, ...rest } = item; 
           return rest;
         })
       };
 
-      // 🚀 3. 發送請求 (增加 mode: 'cors' 確保能讀取回傳值)
+      // 🔍 字數檢查 (Debug 用)
+      const jsonString = JSON.stringify({ projectName, data: leanDetail });
+      console.log(`📊 準備存檔，JSON 長度: ${jsonString.length} (上限 50,000)`);
+
       const response = await fetch(GAS_API_URL, { 
         method: "POST", 
-        body: JSON.stringify({ projectName: projectName.toString(), data: leanDetail }),
-        // 這裡不建議加 mode: 'no-cors'，因為那樣會導致無法讀取 success 訊息
+        body: jsonString
       });
 
-      // 🚀 4. 讀取 Google 端回傳的文字
       const resultText = await response.text();
       console.log("☁️ 雲端回傳結果:", resultText);
 
       if (resultText.toLowerCase().includes("success")) {
-        // 只有真正成功才解除標記
         setTimeout(() => {
           setIsSyncing(false);
           setHasUnsavedChanges(false);
           console.log("✅ 同步成功");
         }, 1000);
       } else {
-        throw new Error("GAS 回傳非成功訊息: " + resultText);
+        throw new Error(resultText);
       }
-
     } catch (e) { 
       setIsSyncing(false);
-      console.error("❌ 雲端連線失敗:", e);
-      // 💡 發生錯誤時，(正在儲存您的修改) 紅字不會消失，提醒你剛才的沒存到
+      console.error("❌ 雲端同步失敗:", e.message); 
+      // 提醒：紅字 (正在儲存您的修改) 不會消失，代表這筆沒存到雲端
     }
   }
 
