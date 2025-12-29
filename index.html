@@ -632,8 +632,12 @@ function MaterialsPage({ materialDB, projectData, setProjectData }) {
         </tbody>
       </table>
 
-      <div className="font-bold text-right">
-        材料總重量：{totalWeight.toFixed(2)} kg
+      {/* --- 修改這部分 --- */}
+      <div className="mt-4 p-3 bg-gray-50 border-t-2 border-blue-500 rounded text-right space-y-1">
+        <div className="text-gray-600">材料總重量：<span className="font-bold text-black">{totalWeight.toFixed(2)}</span> kg</div>
+        <div className="text-lg font-bold text-blue-700">
+          材料總金額合計：{formatMoney(materialItems.reduce((sum, i) => sum + (i.subtotal || 0), 0))} 元
+        </div>
       </div>
     </div>
   );
@@ -962,7 +966,11 @@ const selectedRow = React.useMemo(() => {
           })}
         </tbody>
       </table>
-
+<div className="mt-4 p-3 bg-gray-50 border-t-2 border-orange-500 rounded text-right">
+        <div className="text-lg font-bold text-orange-700">
+          市購品總金額合計：{formatMoney(items.reduce((sum, i) => sum + (i.subtotal || 0), 0))} 元
+        </div>
+      </div>
     </div>
   );
 }
@@ -1246,7 +1254,12 @@ function FabricationPage({ fabricationDB, projectData, setProjectData }) {
           })}
         </tbody>
       </table>
-
+<div className="mt-4 p-3 bg-gray-50 border-t-2 border-green-500 rounded text-right space-y-1">
+        <div className="text-gray-600">製作總工數合計：<span className="font-bold text-black">{items.reduce((sum, i) => sum + (Number(i.qty) || 0), 0)}</span> 工</div>
+        <div className="text-lg font-bold text-green-700">
+          製作總成本金額：{formatMoney(items.reduce((sum, i) => sum + (i.subtotal || 0), 0))} 元
+        </div>
+      </div>
     </div>
   );
 }
@@ -1604,6 +1617,11 @@ function TransportPage({ transportDB, projectData, setProjectData }) {
           })}
         </tbody>
       </table>
+      <div className="mt-4 p-3 bg-gray-50 border-t-2 border-red-500 rounded text-right">
+        <div className="text-lg font-bold text-red-700">
+          運輸費用總金額合計：{formatMoney(items.reduce((sum, i) => sum + (i.subtotal || 0), 0))} 元
+        </div>
+      </div>
     </div>
   );
 }
@@ -1748,6 +1766,11 @@ function InstallPage({ installDB, projectData, setProjectData }) {
           ))}
         </tbody>
       </table>
+      <div className="mt-4 p-3 bg-gray-50 border-t-2 border-purple-500 rounded text-right">
+        <div className="text-lg font-bold text-purple-700">
+          現場安裝總金額合計：{formatMoney(items.reduce((sum, i) => sum + (i.subtotal || 0), 0))} 元
+        </div>
+      </div>
     </div>
   );
 }
