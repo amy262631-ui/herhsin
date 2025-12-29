@@ -2285,35 +2285,63 @@ function App() {
   const [transportDB, setTransportDB] = React.useState([]);
   const [installDB, setInstallDB] = React.useState([]);
 
- // --- ☁️ 雲端讀取 (還原壓縮格式版) ---
+// --- ☁️ 雲端讀取 (對應一列一明細 + 格式還原版) ---
   async function loadProjectsFromCloud() {
     setIsSyncing(true);
     try {
+      // 🚀 1. 向 GAS 請求資料 (會拿到合併好的多工程物件)
       const resp = await fetch(GAS_API_URL);
       const rawCloudData = await resp.json();
       
       const restoredProjects = {};
+
+      // 🚀 2. 遍歷每一個工程名稱
       Object.keys(rawCloudData).forEach(name => {
-        const proj = rawCloudData[name];
+        const proj = rawCloudData[name]; // 這裡包含 { allItems: [], mad: {} }
+
         restoredProjects[name] = {
-          manualAdjustDetail: proj.mad || defaultManualAdjust,
-          allItems: (proj.allItems || []).map(i => ({
-            type: i.t === "M" ? "材料" : (i.t === "P" ? "市購品" : (i.t === "F" ? "製作成本" : (i.t === "T" ? "運輸費用" : "現場安裝"))),
-            equipment: i.e, equipName: i.e,
-            category: i.c, spec: i.s,
-            qty: i.q, pcs: i.q,
-            length: i.l, width: i.w,
-            region: i.r, price: i.p, unitPrice: i.p, subtotal: i.st
-          }))
+          // 還原人工調整欄位 (對應 GAS 裡的 mad 欄位)
+          manualAdjustDetail: proj.mad || { ...defaultManualAdjust },
+          
+          // 還原明細列表：將縮寫 (t, e, q...) 轉回網頁看得懂的長單字
+          allItems: (proj.allItems || []).map(i => {
+            // 判斷類型縮寫
+            const typeMap = { "M": "材料", "P": "市購品", "F": "製作成本", "T": "運輸費用", "I": "現場安裝" };
+            const fullType = typeMap[i.t] || "材料";
+
+            return {
+              type: fullType,
+              equipment: i.e || "",
+              equipName: i.e || "", // 同時填充兩種可能的鍵名以增加相容性
+              category: i.c || "",
+              spec: i.s || "",
+              qty: Number(i.q || 0),
+              pcs: Number(i.q || 0),   // 材料分頁習慣用 pcs
+              length: Number(i.l || 0),
+              width: Number(i.w || 0),
+              region: i.r || "",
+              price: Number(i.p || 0),
+              unitPrice: Number(i.p || 0), // 運輸/安裝習慣用 unitPrice
+              subtotal: Number(i.st || 0)
+            };
+          })
         };
       });
 
+      // 🚀 3. 更新到 React State 與本地快取
       setProjects(restoredProjects);
       saveProjects(restoredProjects);
+      
+      // 🚀 4. 重設修改狀態
       setHasUnsavedChanges(false);
-      console.log("✅ 雲端資料還原成功");
-    } catch (e) { console.error("雲端載入失敗", e); }
-    finally { setIsSyncing(false); }
+      console.log("✅ 雲端資料還原成功 (一列一明細模式)");
+
+    } catch (e) { 
+      console.error("❌ 雲端載入失敗:", e); 
+      alert("讀取雲端資料時出錯，請檢查網路或 GAS 部署。");
+    } finally { 
+      setIsSyncing(false); 
+    }
   }
 // --- ☁️ 雲端儲存 (極致壓縮 + 繞過 CORS 版) ---
   async function saveToCloud(projectName, projectDetail) {
