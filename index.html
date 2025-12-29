@@ -399,7 +399,7 @@ function MaterialsPage({ materialDB, projectData, setProjectData }) {
    * 撈材料
    * ====================================================== */
   const materialItems = projectData.allItems.filter(i => i.type === "材料");
-  const totalWeight = materialItems.reduce((s, i) => s + (i.weight || 0), 0);
+  const totalWeight = materialItems.reduce((s, i) => s + (Number(i.weight) || 0), 0);
 
   /* ========================================================
    * Render
@@ -578,7 +578,7 @@ function MaterialsPage({ materialDB, projectData, setProjectData }) {
                     />
                   </td>
 
-                  <td className="border px-2 py-1">{i.weight.toFixed(2)}</td>
+                  <td className="border px-2 py-1">{(i.weight || 0).toFixed(2)}</td>
                   <td className="border px-2 py-1">{i.subtotal.toLocaleString()}</td>
 
                   <td className="border px-2 py-1 text-center">
@@ -608,7 +608,7 @@ function MaterialsPage({ materialDB, projectData, setProjectData }) {
                 <td className="border px-2 py-1">{i.length}</td>
                 <td className="border px-2 py-1">{i.width ?? "—"}</td>
                 <td className="border px-2 py-1">{i.pcs}</td>
-                <td className="border px-2 py-1">{i.weight.toFixed(2)}</td>
+                <td className="border px-2 py-1">{(i.weight || 0).toFixed(2)}</td>
                 <td className="border px-2 py-1">{i.subtotal.toLocaleString()}</td>
 
                 <td className="border px-2 py-1 text-center">
@@ -634,7 +634,7 @@ function MaterialsPage({ materialDB, projectData, setProjectData }) {
 
       {/* --- 修改這部分 --- */}
       <div className="mt-4 p-3 bg-gray-50 border-t-2 border-blue-500 rounded text-right space-y-1">
-        <div className="text-gray-600">材料總重量：<span className="font-bold text-black">{totalWeight.toFixed(2)}</span> kg</div>
+        <div className="text-gray-600">材料總重量：<span className="font-bold text-black">{(totalWeight || 0).toFixed(2)}</span> kg</div>
         <div className="text-lg font-bold text-blue-700">
           材料總金額合計：{formatMoney(materialItems.reduce((sum, i) => sum + (i.subtotal || 0), 0))} 元
         </div>
@@ -2285,54 +2285,51 @@ function App() {
   const [transportDB, setTransportDB] = React.useState([]);
   const [installDB, setInstallDB] = React.useState([]);
 
-// --- ☁️ 雲端讀取 (修正 CORS 與還原壓縮格式版) ---
-  async function loadProjectsFromCloud() {
-    setIsSyncing(true);
-    try {
-      // 🚀 加上時間戳 t=... 防止瀏覽器快取舊的 CORS 錯誤紀錄
-      const finalUrl = GAS_API_URL + (GAS_API_URL.includes('?') ? '&' : '?') + "t=" + new Date().getTime();
-      
-      const resp = await fetch(finalUrl, {
-        method: "GET",
-        cache: 'no-cache', // 💡 強制不使用快取
-        mode: 'cors'      // 💡 明確要求 CORS 模式
-      });
+// --- ☁️ 雲端讀取 (還原壓縮格式版) ---
+async function loadProjectsFromCloud() {
+  setIsSyncing(true);
+  try {
+    const resp = await fetch(GAS_API_URL);
+    const rawCloudData = await resp.json();
+    
+    const restoredProjects = {};
+    Object.keys(rawCloudData).forEach(name => {
+      const proj = rawCloudData[name];
+      restoredProjects[name] = {
+        manualAdjustDetail: proj.mad || { ...defaultManualAdjust }, // 確保 mad 有預設值
+        allItems: (proj.allItems || []).map(i => {
+          // 🚀 關鍵修改點：確保所有數值欄位都有預設值 0，防止 .toFixed() 報錯
+          return {
+            type: i.t === "M" ? "材料" : (i.t === "P" ? "市購品" : (i.t === "F" ? "製作成本" : (i.t === "T" ? "運輸費用" : "現場安裝"))),
+            equipment: i.e || "",
+            equipName: i.e || "",
+            category: i.c || "",
+            spec: i.s || "",
+            qty: Number(i.q || 0),
+            pcs: Number(i.q || 0),
+            length: Number(i.l || 0),
+            width: Number(i.w || 0),
+            region: i.r || "",
+            price: Number(i.p || 0),
+            unitPrice: Number(i.p || 0),
+            // 💡 這裡加上 Number() 與 || 0 是最重要的
+            weight: Number(i.weight || i.w || 0), 
+            subtotal: Number(i.subtotal || i.st || 0)
+          };
+        })
+      };
+    });
 
-      if (!resp.ok) throw new Error("網路回應錯誤");
-      
-      const rawCloudData = await resp.json();
-      const restoredProjects = {};
-
-      Object.keys(rawCloudData).forEach(name => {
-        const proj = rawCloudData[name]; 
-        restoredProjects[name] = {
-          manualAdjustDetail: proj.mad || { ...defaultManualAdjust },
-          allItems: (proj.allItems || []).map(i => {
-            const typeMap = { "M": "材料", "P": "市購品", "F": "製作成本", "T": "運輸費用", "I": "現場安裝" };
-            return {
-              type: typeMap[i.t] || "材料",
-              equipment: i.e || "", equipName: i.e || "",
-              category: i.c || "", spec: i.s || "",
-              qty: Number(i.q || 0), pcs: Number(i.q || 0),
-              length: Number(i.l || 0), width: Number(i.w || 0),
-              region: i.r || "", price: Number(i.p || 0),
-              unitPrice: Number(i.p || 0), subtotal: Number(i.st || 0)
-            };
-          })
-        };
-      });
-
-      setProjects(restoredProjects);
-      saveProjects(restoredProjects);
-      setHasUnsavedChanges(false);
-      console.log("✅ 雲端資料載入成功");
-
-    } catch (e) { 
-      console.error("❌ 雲端載入失敗:", e); 
-    } finally { 
-      setIsSyncing(false); 
-    }
+    setProjects(restoredProjects);
+    saveProjects(restoredProjects);
+    setHasUnsavedChanges(false);
+    console.log("✅ 雲端資料還原成功");
+  } catch (e) { 
+    console.error("雲端載入失敗", e); 
+  } finally { 
+    setIsSyncing(false); 
   }
+}
 // --- ☁️ 雲端儲存 (極致壓縮 + 繞過 CORS 版) ---
   async function saveToCloud(projectName, projectDetail) {
     if (!projectName) return;
