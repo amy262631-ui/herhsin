@@ -2069,8 +2069,8 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
     XLSX.writeFile(wb, fileName);
   }
 
-  /****************************************************
-   * RETURN UI（含你要求的紅色售價 + 成本合計 + 綠色利潤）
+/****************************************************
+   * RETURN UI（修正版：售價與利潤並排）
    ****************************************************/
   return (
     <div className="p-4 max-w-5xl mx-auto">
@@ -2088,7 +2088,7 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
         <div className="grid grid-cols-2 gap-3">
           <div><p>材料成本：{materialSum.toLocaleString()}</p></div>
           <div>
-            <label>人工調整：
+            <label className="text-sm">人工調整：
               <input
                 type="number"
                 value={manualAdjustDetail.material}
@@ -2100,7 +2100,7 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
 
           <div><p>市購品成本：{purchaseSum.toLocaleString()}</p></div>
           <div>
-            <label>人工調整：
+            <label className="text-sm">人工調整：
               <input
                 type="number"
                 value={manualAdjustDetail.purchase}
@@ -2112,7 +2112,7 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
 
           <div><p>製作成本：{fabSum.toLocaleString()}</p></div>
           <div>
-            <label>人工調整：
+            <label className="text-sm">人工調整：
               <input
                 type="number"
                 value={manualAdjustDetail.fabrication}
@@ -2124,7 +2124,7 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
 
           <div><p>運輸費用：{transSum.toLocaleString()}</p></div>
           <div>
-            <label>人工調整：
+            <label className="text-sm">人工調整：
               <input
                 type="number"
                 value={manualAdjustDetail.transport}
@@ -2136,7 +2136,7 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
 
           <div><p>現場安裝成本：{installSum.toLocaleString()}</p></div>
           <div>
-            <label>人工調整：
+            <label className="text-sm">人工調整：
               <input
                 type="number"
                 value={manualAdjustDetail.install}
@@ -2148,75 +2148,74 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
         </div>
 
         {/* 小計 */}
-        <div className="mt-4">
-          <p className="font-bold">人工調整小計：{manualTotal.toLocaleString()}</p>
-          <p className="font-bold text-lg">成本合計：{finalCost.toLocaleString()}</p>
+        <div className="mt-4 pt-4 border-t border-gray-100 text-right">
+          <p className="text-gray-600">人工調整小計：{manualTotal.toLocaleString()}</p>
+          <p className="font-bold text-xl text-blue-700">成本合計：{finalCost.toLocaleString()} 元</p>
         </div>
       </div>
 
       {/* 管銷、毛利率、建議售價 */}
-<div className="bg-white p-4 rounded shadow mb-4">
-  <div className="grid grid-cols-2 gap-2 mt-2">
+      <div className="bg-white p-4 rounded shadow mb-4">
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className="font-bold text-sm block mb-1">管銷(%)</label>
+            <input
+              type="number"
+              value={adminRate}
+              onChange={(e) => setAdminRate(Number(e.target.value))}
+              className="border p-1 w-full"
+            />
+            <p className="text-sm text-gray-500 mt-1">管銷費：{adminFee.toLocaleString()} 元</p>
+          </div>
 
-    <label>管銷(%)
-      <input
-        type="number"
-        value={adminRate}
-        onChange={(e) => setAdminRate(Number(e.target.value))}
-        className="border p-1 w-full"
-      />
-    </label>
+          <div>
+            <label className="font-bold text-sm block mb-1">毛利率(%)</label>
+            <input
+              type="number"
+              value={profitRate}
+              onChange={(e) => setProfitRate(Number(e.target.value))}
+              className="border p-1 w-full"
+            />
+            <p className="font-bold text-lg text-black mt-1">
+              最終成本(含管銷)：{(finalCost + adminFee).toLocaleString()} 元
+            </p>
+          </div>
+        </div>
 
-    <p>管銷費：{adminFee.toLocaleString()} 元</p>
+        {/* 🚀 建議售價 + 預計利潤 並排區塊 */}
+        <div className="mt-6 p-4 bg-gray-50 border-2 border-red-500 rounded flex justify-between items-end flex-wrap gap-4">
+          {/* 左邊：建議售價 */}
+          <div>
+            <div className="text-red-500 text-sm font-bold mb-1">建議售價</div>
+            <div className="text-red-600 font-bold text-2xl">
+              {Math.round(finalTotalWithMargin).toLocaleString()} <span className="text-sm">元</span>
+            </div>
+          </div>
 
-    <label>毛利率(%)
-      <input
-        type="number"
-        value={profitRate}
-        onChange={(e) => setProfitRate(Number(e.target.value))}
-        className="border p-1 w-full"
-      />
-    </label>
-
-    {/* 1️⃣ 最終成本（含管銷） → 黑色 */}
-    <p className="font-bold text-lg text-black">
-      最終成本（含管銷）：{(finalCost + adminFee).toLocaleString()} 元
-    </p>
-
-    
-<div className="mt-6 p-4 bg-gray-50 border-2 border-red-500 rounded flex justify-between items-end flex-wrap">
-  {/* 左邊：建議售價 */}
-  <div>
-    <div className="text-red-500 text-sm font-bold mb-1">建議售價</div>
-    <div className="text-red-600 font-bold text-2xl">
-      {Math.round(finalTotalWithMargin).toLocaleString()} <span className="text-sm">元</span>
-    </div>
-  </div>
-
-  {/* 🚀 右邊：預計利潤 (從最下面搬上來) */}
-  <div className="text-right">
-    <div className="text-green-600 text-sm font-bold mb-1">預計利潤</div>
-    <div className="text-green-600 font-bold text-xl border-b-2 border-green-200 pb-1">
-      {Math.round(expectedProfit).toLocaleString()} <span className="text-sm text-gray-500">元</span>
-    </div>
-  </div>
-</div>
-</div>
+          {/* 右邊：預計利潤 */}
+          <div className="text-right">
+            <div className="text-green-600 text-sm font-bold mb-1">預計利潤</div>
+            <div className="text-green-600 font-bold text-xl border-b-2 border-green-200 pb-1">
+              {Math.round(expectedProfit).toLocaleString()} <span className="text-sm text-gray-500">元</span>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* 匯出 Excel + 列印 */}
-      <div className="flex gap-3 print-hidden mt-4">
+      <div className="flex gap-3 print-hidden mt-6 pb-10">
         <button
           onClick={exportExcel}
-          className="bg-green-600 text-white px-4 py-2 rounded shadow"
+          className="bg-green-600 text-white px-6 py-2 rounded shadow font-bold hover:bg-green-700"
         >
           匯出 Excel
         </button>
 
         <button
           onClick={() => window.print()}
-          className="bg-gray-700 text-white px-4 py-2 rounded shadow"
+          className="bg-gray-700 text-white px-6 py-2 rounded shadow font-bold hover:bg-gray-800"
         >
-          列印
+          列印總表
         </button>
       </div>
     </div>
