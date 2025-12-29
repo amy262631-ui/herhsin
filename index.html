@@ -2285,22 +2285,25 @@ function App() {
   const [transportDB, setTransportDB] = React.useState([]);
   const [installDB, setInstallDB] = React.useState([]);
 
-// --- ☁️ 雲端讀取 (還原壓縮格式版) ---
+// --- ☁️ 雲端讀取 (修正重量歸零版) ---
 async function loadProjectsFromCloud() {
   setIsSyncing(true);
   try {
-    const resp = await fetch(GAS_API_URL);
+    const finalUrl = GAS_API_URL + (GAS_API_URL.includes('?') ? '&' : '?') + "t=" + new Date().getTime();
+    const resp = await fetch(finalUrl, { method: "GET", mode: "cors" });
     const rawCloudData = await resp.json();
     
     const restoredProjects = {};
     Object.keys(rawCloudData).forEach(name => {
       const proj = rawCloudData[name];
       restoredProjects[name] = {
-        manualAdjustDetail: proj.mad || { ...defaultManualAdjust }, // 確保 mad 有預設值
+        manualAdjustDetail: proj.mad || { ...defaultManualAdjust },
         allItems: (proj.allItems || []).map(i => {
-          // 🚀 關鍵修改點：確保所有數值欄位都有預設值 0，防止 .toFixed() 報錯
+          const typeMap = { "M": "材料", "P": "市購品", "F": "製作成本", "T": "運輸費用", "I": "現場安裝" };
+          
+          // 🚀 關鍵修復點：確保讀取壓縮後的欄位 'i.w' 並轉回 'weight'
           return {
-            type: i.t === "M" ? "材料" : (i.t === "P" ? "市購品" : (i.t === "F" ? "製作成本" : (i.t === "T" ? "運輸費用" : "現場安裝"))),
+            type: typeMap[i.t] || "材料",
             equipment: i.e || "",
             equipName: i.e || "",
             category: i.c || "",
@@ -2312,9 +2315,9 @@ async function loadProjectsFromCloud() {
             region: i.r || "",
             price: Number(i.p || 0),
             unitPrice: Number(i.p || 0),
-            // 💡 這裡加上 Number() 與 || 0 是最重要的
-            weight: Number(i.weight || i.w || 0), 
-            subtotal: Number(i.subtotal || i.st || 0)
+            // 💡 修正這裡：優先讀取 i.weight，若無則讀取壓縮標籤 i.w
+            weight: Number(i.weight !== undefined ? i.weight : (i.w || 0)), 
+            subtotal: Number(i.subtotal !== undefined ? i.subtotal : (i.st || 0))
           };
         })
       };
@@ -2324,11 +2327,8 @@ async function loadProjectsFromCloud() {
     saveProjects(restoredProjects);
     setHasUnsavedChanges(false);
     console.log("✅ 雲端資料還原成功");
-  } catch (e) { 
-    console.error("雲端載入失敗", e); 
-  } finally { 
-    setIsSyncing(false); 
-  }
+  } catch (e) { console.error("雲端載入失敗", e); }
+  finally { setIsSyncing(false); }
 }
 // --- ☁️ 雲端儲存 (極致壓縮 + 繞過 CORS 版) ---
   async function saveToCloud(projectName, projectDetail) {
