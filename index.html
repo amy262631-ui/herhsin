@@ -1255,11 +1255,21 @@ function FabricationPage({ fabricationDB, projectData, setProjectData }) {
         </tbody>
       </table>
 <div className="mt-4 p-3 bg-gray-50 border-t-2 border-green-500 rounded text-right space-y-1">
-        <div className="text-gray-600">製作總工數合計：<span className="font-bold text-black">{items.reduce((sum, i) => sum + (Number(i.qty) || 0), 0)}</span> 工</div>
-        <div className="text-lg font-bold text-green-700">
-          製作總成本金額：{formatMoney(items.reduce((sum, i) => sum + (i.subtotal || 0), 0))} 元
-        </div>
-      </div>
+  <div className="text-gray-600">
+    製作總工數合計：
+    <span className="font-bold text-black">
+      {/* 🚀 修正點：只篩選 spec (項目) 為 "工數" 的項目進行加總 */}
+      {items
+        .filter(i => (i.spec || "").trim() === "工數")
+        .reduce((sum, i) => sum + (Number(i.qty) || 0), 0)
+        .toLocaleString()}
+    </span> 工
+  </div>
+  
+  <div className="text-lg font-bold text-green-700">
+    製作總成本金額：{formatMoney(items.reduce((sum, i) => sum + (i.subtotal || 0), 0))} 元
+  </div>
+</div>
     </div>
   );
 }
