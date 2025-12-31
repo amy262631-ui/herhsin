@@ -631,7 +631,58 @@ function MaterialsPage({ materialDB, projectData, setProjectData }) {
           })}
         </tbody>
       </table>
+是的，就在這個位置！
 
+為了讓您能清楚看到每個設備的重量加總與金額加總，建議將「彙總表」插入在原本的明細表格（</table>）之後，以及藍色總計區塊（{/* --- 修改這部分 --- */}）之前。
+
+請參考以下代碼進行替換：
+
+JavaScript
+
+          })}
+        </tbody>
+      </table>
+
+      {/* 🚀 新增：依設備名稱分組的彙總表 */}
+      <div className="mt-8 mb-4">
+        <h3 className="text-md font-bold mb-2 text-gray-700 flex items-center">
+          <span className="w-1 h-5 bg-blue-500 mr-2"></span>
+          設備彙總統計
+        </h3>
+        <div className="overflow-hidden border rounded-lg shadow-sm">
+          <table className="w-full text-sm text-left bg-white">
+            <thead className="bg-blue-50 text-blue-800 font-bold">
+              <tr>
+                <th className="p-2 border-b">設備名稱</th>
+                <th className="p-2 border-b text-right">分項總重量 (kg)</th>
+                <th className="p-2 border-b text-right">分項材料金額 (元)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {Object.entries(
+                materialItems.reduce((acc, item) => {
+                  // 抓取設備名稱，若空白則歸類為 "未命名設備"
+                  const name = (item.equipName || "未命名設備").trim();
+                  if (!acc[name]) acc[name] = { weight: 0, cost: 0 };
+                  acc[name].weight += Number(item.weight) || 0;
+                  acc[name].cost += Number(item.subtotal) || 0;
+                  return acc;
+                }, {})
+              ).map(([name, data]) => (
+                <tr key={name} className="hover:bg-gray-50">
+                  <td className="p-2 font-medium">{name}</td>
+                  <td className="p-2 text-right">
+                    {data.weight.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+                  </td>
+                  <td className="p-2 text-right font-bold">
+                    {Math.round(data.cost).toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
       {/* --- 修改這部分 --- */}
       <div className="mt-4 p-3 bg-gray-50 border-t-2 border-blue-500 rounded text-right space-y-1">
         <div className="text-gray-600">材料總重量：<span className="font-bold text-black">{(totalWeight || 0).toFixed(2)}</span> kg</div>
