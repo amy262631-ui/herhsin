@@ -1006,7 +1006,7 @@ const selectedRow = React.useMemo(() => {
           })}
         </tbody>
       </table>
-      {/* 🚀 新增：市購品依設備彙總統計 */}
+      {/* 🚀 修正版：市購品依設備彙總統計 */}
       <div className="mt-8 mb-4">
         <h3 className="text-md font-bold mb-2 text-gray-700 flex items-center">
           <span className="w-1 h-5 bg-orange-500 mr-2"></span>
@@ -1022,9 +1022,9 @@ const selectedRow = React.useMemo(() => {
             </thead>
             <tbody className="divide-y">
               {Object.entries(
-                // 假設您的市購品陣列名稱是 purchasedItems，請根據實際變數名修改
-                purchasedItems.reduce((acc, item) => {
-                  const name = (item.equipName || "未命名設備").trim();
+                // 🚀 關鍵修正：這裡使用 items 而不是 purchasedItems
+                items.reduce((acc, item) => {
+                  const name = (item.equipment || "未命名設備").trim();
                   if (!acc[name]) acc[name] = 0;
                   acc[name] += Number(item.subtotal) || 0;
                   return acc;
@@ -1038,7 +1038,7 @@ const selectedRow = React.useMemo(() => {
                 </tr>
               ))}
               {/* 如果完全沒資料時顯示 */}
-              {purchasedItems.length === 0 && (
+              {items.length === 0 && (
                 <tr>
                   <td colSpan="2" className="p-4 text-center text-gray-400">尚無設備資料</td>
                 </tr>
@@ -1047,7 +1047,6 @@ const selectedRow = React.useMemo(() => {
           </table>
         </div>
       </div>
-
       {/* --- 原本的市購品總金額合計 --- */}
 <div className="mt-4 p-3 bg-gray-50 border-t-2 border-orange-500 rounded text-right">
         <div className="text-lg font-bold text-orange-700">
