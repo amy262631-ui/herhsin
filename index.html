@@ -2134,9 +2134,10 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
         </div>
       </div>
 
-      {/* 功能按鈕 */}
+     {/* 按鈕區 */}
       <div className="flex gap-4 print-hidden pb-10">
-        <button onClick={() => window.print()} className="flex-1 bg-gray-700 text-white py-3 rounded font-bold shadow-lg hover:bg-gray-800 transition-all">列印分析總表 (A4)</button>
+        <button onClick={exportExcel} className="flex-1 bg-green-600 text-white py-3 rounded font-bold shadow hover:bg-green-700">匯出 Excel</button>
+        <button onClick={() => window.print()} className="flex-1 bg-gray-700 text-white py-3 rounded font-bold shadow hover:bg-gray-800">列印總表 (A4)</button>
       </div>
     </div>
   );
