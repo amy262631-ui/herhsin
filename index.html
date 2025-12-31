@@ -1944,174 +1944,199 @@ function InstallPage({ installDB, projectData, setProjectData }) {
   );
 }
 /****************************************************
- * PART 9 — SummaryPage（總表）
- * 功能：成本分析、雲端記憶、底價試算、A4一頁列印
+ * PART 9 — SummaryPage（總表）- 完整復原與優化版
  ****************************************************/
 function SummaryPage({ projectData, currentProject, updateProjectData }) {
   const chartRef = React.useRef(null);
 
-  // 1. 五大類成本小計
-  const sumByType = (type) =>
-    projectData.allItems
+  /*************** 1. 基礎成本計算 (確保讀取金額) ***************/
+  const sumByType = (type) => {
+    return (projectData.allItems || [])
       .filter((i) => i.type === type)
-      .reduce((a, b) => a + (b.subtotal || 0), 0);
+      .reduce((a, b) => a + (Number(b.subtotal) || 0), 0);
+  };
 
   const materialSum = sumByType("材料");
   const purchaseSum = sumByType("市購品");
   const fabSum = sumByType("製作成本");
   const transSum = sumByType("運輸費用");
   const installSum = sumByType("現場安裝");
+
   const fiveTotal = materialSum + purchaseSum + fabSum + transSum + installSum;
 
-  // 2. 人工調整欄位
+  /*************** 2. 人工調整 (記憶功能) ***************/
   const manualAdjustDetail = projectData.manualAdjustDetail || {
     material: 0, purchase: 0, fabrication: 0, transport: 0, install: 0,
   };
-  const manualTotal = Object.values(manualAdjustDetail).reduce((a, b) => a + Number(b || 0), 0);
-  const finalCost = fiveTotal + manualTotal;
 
-  // 3. 讀取雲端設定 (若無則預設)
+  const manualTotal = Object.values(manualAdjustDetail).reduce((a, b) => a + Number(b || 0), 0);
+  
+  // 核心成本合計 (五大類 + 人工調整)
+  const finalCost = fiveTotal + manualTotal; 
+
+  /*************** 3. 管銷與毛利計算 (正確滾算) ***************/
   const adminRate = projectData.adminRate ?? 15;
   const profitRate = projectData.profitRate ?? 35;
   const floorPrice = projectData.floorPrice ?? 0;
 
-  // 4. 計算售價與利潤
+  // 管銷費 = 成本合計 * 管銷率
   const adminFee = Math.round(finalCost * (adminRate / 100));
-  const suggestPrice = Math.round((finalCost + adminFee) / (1 - profitRate / 100));
-  const profitAmount = suggestPrice - finalCost - adminFee;
+  
+  // 最終總成本 (含管銷費)
+  const totalCostWithAdmin = finalCost + adminFee;
 
-  // 5. 底價試算
-  const floorProfit = floorPrice > 0 ? floorPrice - finalCost - adminFee : 0;
+  // 建議售價 = 最終總成本 / (1 - 毛利率)
+  const suggestPrice = Math.round(totalCostWithAdmin / (1 - profitRate / 100));
+  
+  // 預計利潤 = 建議售價 - 最終總成本
+  const profitAmount = suggestPrice - totalCostWithAdmin;
+
+  // 議價底價分析
+  const floorProfit = floorPrice > 0 ? floorPrice - totalCostWithAdmin : 0;
   const floorProfitRate = floorPrice > 0 ? (floorProfit / floorPrice) * 100 : 0;
 
-  // 6. 更新函式 (存入雲端)
+  /*************** 4. 更新函式 (同步雲端) ***************/
   function handleSummaryUpdate(field, value) {
-    const numValue = value === "" ? 0 : Number(value);
-    updateProjectData({ ...projectData, [field]: numValue });
+    updateProjectData({ ...projectData, [field]: value === "" ? 0 : Number(value) });
   }
 
   function updateManualAdjust(field, value) {
-    const num = value === "" ? "" : Number(value);
-    updateProjectData({
-      ...projectData,
-      manualAdjustDetail: { ...manualAdjustDetail, [field]: num },
-    });
+    const newDetail = { ...manualAdjustDetail, [field]: value === "" ? 0 : Number(value) };
+    updateProjectData({ ...projectData, manualAdjustDetail: newDetail });
   }
 
-  // 7. 圓餅圖 Effect
+  /*************** 5. 圓餅圖 (復原百分比標籤) ***************/
   React.useEffect(() => {
     const ctx = document.getElementById("summaryChart");
     if (!ctx) return;
-    if (window.summaryChart && typeof window.summaryChart.destroy === "function") {
-      window.summaryChart.destroy();
-    }
-    const data = [materialSum, purchaseSum, fabSum, transSum, installSum];
+    if (window.summaryChart instanceof Chart) window.summaryChart.destroy();
+
+    const dataValues = [materialSum, purchaseSum, fabSum, transSum, installSum];
+    
     window.summaryChart = new Chart(ctx, {
       type: "pie",
       data: {
         labels: ["材料", "市購品", "製作", "運輸", "安裝"],
-        datasets: [{ data, backgroundColor: ["#4fa3d1", "#ffcc66", "#66cc99", "#ff6666", "#9999ff"] }],
+        datasets: [{
+          data: dataValues,
+          backgroundColor: ["#4fa3d1", "#ffcc66", "#66cc99", "#ff6666", "#9999ff"],
+        }],
       },
       options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { position: "bottom" } }
-      }
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: "bottom" },
+          datalabels: {
+            display: true, // 🚀 強制顯示百分比標籤
+            color: "#000",
+            font: { weight: "bold", size: 14 },
+            formatter: (value, context) => {
+              const sum = context.dataset.data.reduce((a, b) => a + b, 0);
+              return sum === 0 ? "" : ((value / sum) * 100).toFixed(1) + "%";
+            },
+          },
+        },
+      },
+      plugins: [ChartDataLabels],
     });
   }, [materialSum, purchaseSum, fabSum, transSum, installSum]);
 
-  // 8. Excel 匯出
-  function exportExcel() {
-    const wb = XLSX.utils.book_new();
-    const rows = [
-      ["工程名稱", currentProject],
-      ["項目", "金額"],
-      ["成本合計", finalCost],
-      ["建議售價", suggestPrice],
-      ["預計利潤", profitAmount]
-    ];
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    XLSX.utils.book_append_sheet(wb, ws, "成本分析");
-    XLSX.writeFile(wb, `${currentProject}_成本分析.xlsx`);
-  }
-
   return (
     <div className="p-4 max-w-5xl mx-auto">
-      <h2 className="text-2xl font-bold mb-4">成本總表</h2>
+      <h2 className="text-2xl font-bold mb-4">成本分析總表</h2>
+      
+      {/* 圓餅圖區塊 */}
       <div className="w-full h-80 mb-6 bg-white rounded shadow p-2">
         <canvas id="summaryChart"></canvas>
       </div>
 
+      {/* 五大成本與調整區 */}
       <div className="bg-white p-4 rounded shadow mb-4">
-        <h3 className="font-bold mb-4">五大成本 + 人工調整</h3>
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          {["material", "purchase", "fabrication", "transport", "install"].map((key, idx) => (
-            <React.Fragment key={key}>
-              <div className="font-bold">{["材料", "市購品", "製作", "運輸", "安裝"][idx]}成本:</div>
-              <input 
-                type="number" 
-                value={manualAdjustDetail[key]} 
-                onChange={(e) => updateManualAdjust(key, e.target.value)}
-                className="border p-1 rounded w-full"
-                placeholder="手動調整"
-              />
+        <h3 className="font-bold text-lg mb-4 border-b pb-2">五大成本 + 人工調整</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-2">
+          {[
+            { label: "材料成本", val: materialSum, key: "material" },
+            { label: "市購品成本", val: purchaseSum, key: "purchase" },
+            { label: "製作成本", val: fabSum, key: "fabrication" },
+            { label: "運輸費用", val: transSum, key: "transport" },
+            { label: "現場安裝成本", val: installSum, key: "install" }
+          ].map(item => (
+            <React.Fragment key={item.key}>
+              <div className="flex justify-between items-center py-1">
+                <span className="text-gray-700">{item.label}：{item.val.toLocaleString()}</span>
+              </div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs text-gray-400 whitespace-nowrap">人工調整：</span>
+                <input
+                  type="number"
+                  value={manualAdjustDetail[item.key] || ""}
+                  onChange={(e) => updateManualAdjust(item.key, e.target.value)}
+                  className="border-b w-full focus:border-blue-500 outline-none text-right"
+                />
+              </div>
             </React.Fragment>
           ))}
         </div>
         <div className="mt-4 pt-4 border-t text-right">
+          <p className="text-gray-500 text-sm">人工調整小計：{manualTotal.toLocaleString()}</p>
           <p className="font-bold text-xl text-blue-700">成本合計：{finalCost.toLocaleString()} 元</p>
         </div>
       </div>
 
+      {/* 計算與售價區 */}
       <div className="bg-white p-4 rounded shadow mb-4">
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
-            <label className="text-xs font-bold">管銷(%)</label>
-            <input type="number" value={adminRate} onChange={(e)=>handleSummaryUpdate("adminRate", e.target.value)} className="border p-1 w-full rounded" />
+            <label className="font-bold text-sm block mb-1 text-gray-600">管銷(%)</label>
+            <input type="number" value={adminRate} onChange={(e)=>handleSummaryUpdate("adminRate", e.target.value)} className="border p-2 w-full rounded font-bold" />
+            <p className="text-xs text-blue-500 mt-1">管銷金額：{adminFee.toLocaleString()} 元</p>
           </div>
           <div>
-            <label className="text-xs font-bold">毛利(%)</label>
-            <input type="number" value={profitRate} onChange={(e)=>handleSummaryUpdate("profitRate", e.target.value)} className="border p-1 w-full rounded" />
+            <label className="font-bold text-sm block mb-1 text-gray-600">預計毛利率(%)</label>
+            <input type="number" value={profitRate} onChange={(e)=>handleSummaryUpdate("profitRate", e.target.value)} className="border p-2 w-full rounded font-bold text-blue-600" />
+            <p className="font-bold text-xs mt-1">最終總成本(含管銷)：{totalCostWithAdmin.toLocaleString()} 元</p>
           </div>
         </div>
 
-        <div className="p-4 bg-red-50 border-2 border-red-500 rounded flex justify-between items-center">
+        {/* 售價紅框 */}
+        <div className="p-4 bg-red-50 border-2 border-red-500 rounded flex justify-between items-center mb-4">
           <div>
-            <div className="text-red-500 text-xs font-bold">建議售價</div>
-            <div className="text-red-600 font-bold text-2xl">{suggestPrice.toLocaleString()} 元</div>
+            <div className="text-red-500 text-xs font-bold mb-1">建議售價</div>
+            <div className="text-red-600 font-black text-3xl">{suggestPrice.toLocaleString()} 元</div>
           </div>
-          <div className="text-right">
-            <div className="text-green-600 text-xs font-bold">預計利潤</div>
-            <div className="text-green-600 font-bold text-xl">{profitAmount.toLocaleString()} 元</div>
+          <div className="text-right text-green-700">
+            <div className="text-xs font-bold mb-1">預計毛利額</div>
+            <div className="font-black text-2xl">{profitAmount.toLocaleString()} 元</div>
           </div>
         </div>
 
-        <div className="mt-4 p-4 bg-blue-50 border-2 border-blue-400 rounded">
-          <h4 className="font-bold text-blue-800 text-sm mb-2">💰 議價底價試算</h4>
-          <div className="grid grid-cols-3 gap-2 items-center">
+        {/* 議價藍框 */}
+        <div className="p-4 bg-blue-50 border-2 border-blue-400 rounded-lg">
+          <h4 className="font-bold text-blue-800 text-sm mb-3">🛡️ 議價底價分析</h4>
+          <div className="grid grid-cols-3 gap-4 items-center">
             <input 
               type="number" 
               value={floorPrice || ""} 
               onChange={(e) => handleSummaryUpdate("floorPrice", e.target.value)}
-              className="border p-2 rounded font-bold"
-              placeholder="輸入底價"
+              className="border-2 border-blue-200 p-2 rounded font-bold w-full"
+              placeholder="輸入底價..."
             />
-            <div className="text-center text-sm font-bold text-blue-700">{floorProfit.toLocaleString()} 元</div>
-            <div className="text-center text-sm font-bold text-blue-700">{floorProfitRate.toFixed(1)} %</div>
+            <div className="text-center">
+              <div className="text-[10px] text-gray-400">底價利潤</div>
+              <div className={`font-bold ${floorProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>{Math.round(floorProfit).toLocaleString()}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-[10px] text-gray-400">實質毛利</div>
+              <div className="font-bold text-blue-700">{floorProfitRate.toFixed(1)}%</div>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="flex gap-3 print-hidden mt-6 pb-10">
-        <button onClick={exportExcel} className="bg-green-600 text-white px-6 py-2 rounded font-bold">匯出 Excel</button>
-        <button onClick={() => {
-          const originalTitle = document.title;
-          document.title = `${currentProject}_成本總表`;
-          const style = document.createElement('style');
-          style.innerHTML = `@media print { @page { size: A4 portrait; margin: 1cm; } body { zoom: 80%; } .print-hidden { display: none !important; } }`;
-          document.head.appendChild(style);
-          window.print();
-          setTimeout(() => { document.title = originalTitle; document.head.removeChild(style); }, 1000);
-        }} className="bg-gray-700 text-white px-6 py-2 rounded font-bold">列印總表</button>
+      {/* 功能按鈕 */}
+      <div className="flex gap-4 print-hidden pb-10">
+        <button onClick={() => window.print()} className="flex-1 bg-gray-700 text-white py-3 rounded font-bold shadow-lg hover:bg-gray-800 transition-all">列印分析總表 (A4)</button>
       </div>
     </div>
   );
