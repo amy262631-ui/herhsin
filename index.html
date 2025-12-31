@@ -2402,38 +2402,32 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
           匯出 Excel
         </button>
 
-        是的，就是修改這段 <button> 的 onClick 觸發內容。
+        <button
+          onClick={() => {
+            // 1. 取得日期並轉為 YYMMDD
+            const now = new Date();
+            const yy = String(now.getFullYear()).slice(-2);
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            const dd = String(now.getDate()).padStart(2, '0');
+            const dateStr = `${yy}${mm}${dd}`;
 
-為了達成您要求的 「YYMMDD-工案名稱-成本分析總表」 自動命名功能，請將原本的這段代碼替換成下面這個版本：
+            // 2. 取得工案名稱 (依照您的變數 currentProject)
+            const projectName = currentProject || "未命名工案";
 
-JavaScript
+            // 3. 暫時修改網頁標題
+            const originalTitle = document.title;
+            document.title = `${dateStr}-${projectName}-成本分析總表`;
 
-<button
-  onClick={() => {
-    // 1. 取得日期並轉為 YYMMDD
-    const now = new Date();
-    const yy = String(now.getFullYear()).slice(-2);
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const dd = String(now.getDate()).padStart(2, '0');
-    const dateStr = `${yy}${mm}${dd}`;
+            // 4. 執行列印
+            window.print();
 
-    // 2. 取得工案名稱 (依照您的變數 currentProject)
-    const projectName = currentProject || "未命名工案";
-
-    // 3. 暫時修改網頁標題
-    const originalTitle = document.title;
-    document.title = `${dateStr}-${projectName}-成本分析總表`;
-
-    // 4. 執行列印
-    window.print();
-
-    // 5. 結束後恢復原標題
-    setTimeout(() => { document.title = originalTitle; }, 1000);
-  }}
-  className="bg-gray-700 text-white px-6 py-2 rounded shadow font-bold hover:bg-gray-800"
->
-  列印總表
-</button>
+            // 5. 結束後恢復原標題
+            setTimeout(() => { document.title = originalTitle; }, 1000);
+          }}
+          className="bg-gray-700 text-white px-6 py-2 rounded shadow font-bold hover:bg-gray-800"
+        >
+          列印總表
+        </button>
       </div>
     </div>
   );
