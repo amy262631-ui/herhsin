@@ -20,14 +20,45 @@
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 
   
-  <!-- Excel 匯出用 SheetJS -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+ <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <style>
     body { background-color: #f3f4f6; }
     .print-hidden { display: block; }
+
     @media print {
+      /* 1. 隱藏不需列印的 UI */
       .print-hidden { display: none !important; }
+
+      /* 2. 設定 A4 尺寸與邊界 */
+      @page {
+        size: A4 portrait;
+        margin: 1cm;
+      }
+
+      /* 3. 強制縮放與背景設定 */
+      body {
+        zoom: 85%; /* 建議調至 85% 左右，更能確保包含「底價試算」後仍能在一頁內 */
+        background: white !important;
+        -webkit-print-color-adjust: exact; /* 確保顏色（紅框/藍框）能印出來 */
+      }
+
+      /* 4. 縮小圖表避免佔位 */
+      #summaryChart {
+        max-height: 250px !important;
+        margin: 0 auto;
+      }
+
+      /* 5. 移除陰影並簡化框線 */
+      .shadow, .rounded {
+        box-shadow: none !important;
+        border: 1px solid #ddd !important;
+      }
+
+      /* 6. 防止區塊被跨頁切斷 */
+      .bg-white, .border-red-500, .bg-blue-50 {
+        break-inside: avoid;
+      }
     }
   </style>
 </head>
@@ -2402,31 +2433,46 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
         </button>
 
         <button
-          onClick={() => {
-            // 1. 取得日期並轉為 YYMMDD
-            const now = new Date();
-            const yy = String(now.getFullYear()).slice(-2);
-            const mm = String(now.getMonth() + 1).padStart(2, '0');
-            const dd = String(now.getDate()).padStart(2, '0');
-            const dateStr = `${yy}${mm}${dd}`;
+  onClick={() => {
+    // 1. 取得日期並轉為 YYMMDD
+    const now = new Date();
+    const yy = String(now.getFullYear()).slice(-2);
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const dateStr = `${yy}${mm}${dd}`;
 
-            // 2. 取得工案名稱 (依照您的變數 currentProject)
-            const projectName = currentProject || "未命名工案";
+    // 2. 取得工案名稱
+    const projectName = currentProject || "未命名工案";
 
-            // 3. 暫時修改網頁標題
-            const originalTitle = document.title;
-            document.title = `${dateStr}-${projectName}-成本分析總表`;
+    // 3. 暫時修改網頁標題 (這會決定 PDF 的預設檔名)
+    const originalTitle = document.title;
+    document.title = `${dateStr}-${projectName}-成本分析總表`;
 
-            // 4. 執行列印
-            window.print();
+    // 🚀 4. 新增：強制縮放內容以符合 A4 一頁 (針對列印優化)
+    const style = document.createElement('style');
+    style.innerHTML = `
+      @media print {
+        @page { size: A4 portrait; margin: 1cm; }
+        body { zoom: 82%; } /* 縮放至 82% 通常能完美容納圖表+建議售價+底價區 */
+        canvas { max-height: 280px !important; } /* 限制圓餅圖高度 */
+        .print-hidden { display: none !important; }
+      }
+    `;
+    document.head.appendChild(style);
 
-            // 5. 結束後恢復原標題
-            setTimeout(() => { document.title = originalTitle; }, 1000);
-          }}
-          className="bg-gray-700 text-white px-6 py-2 rounded shadow font-bold hover:bg-gray-800"
-        >
-          列印總表
-        </button>
+    // 5. 執行列印
+    window.print();
+
+    // 6. 結束後恢復原標題並移除列印專用樣式
+    setTimeout(() => { 
+      document.title = originalTitle; 
+      document.head.removeChild(style);
+    }, 1000);
+  }}
+  className="bg-gray-700 text-white px-6 py-2 rounded shadow font-bold hover:bg-gray-800"
+>
+  列印總表
+</button>
       </div>
     </div>
   );
