@@ -2314,15 +2314,15 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
         </div>
       </div>
 
-      {/* 管銷、毛利率、建議售價 */}
+      {/* 管銷、毛利率、建議售價與底價試算區 */}
       <div className="bg-white p-4 rounded shadow mb-4">
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <label className="font-bold text-sm block mb-1">管銷(%)</label>
+            {/* 🚀 改用 handleSummaryUpdate 確保切換頁面後紀錄還在 */}
             <input
               type="number"
               value={adminRate}
-              {/* 🚀 修正點：改用 handleSummaryUpdate 來確保切換頁面後紀錄還在 */}
               onChange={(e) => handleSummaryUpdate("adminRate", e.target.value)}
               className="border p-1 w-full rounded"
             />
@@ -2331,10 +2331,10 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
 
           <div>
             <label className="font-bold text-sm block mb-1">毛利率(%)</label>
+            {/* 🚀 改用 handleSummaryUpdate 來紀錄修改後的毛利率 */}
             <input
               type="number"
               value={profitRate}
-              {/* 🚀 修正點：改用 handleSummaryUpdate 來紀錄修改後的毛利率 */}
               onChange={(e) => handleSummaryUpdate("profitRate", e.target.value)}
               className="border p-1 w-full rounded"
             />
@@ -2360,7 +2360,7 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
           </div>
         </div>
 
-        {/* 🚀 新增：議價底價試算區 (讓您在砍價時心裡有底) */}
+        {/* 🚀 議價底價試算區 (讓您在砍價時心裡有底) */}
         <div className="mt-4 p-4 bg-blue-50 border-2 border-blue-400 rounded-lg shadow-inner">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-blue-700">💰</span>
@@ -2392,7 +2392,6 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
           </div>
         </div>
       </div>
-
       {/* 匯出 Excel + 列印 */}
       <div className="flex gap-3 print-hidden mt-6 pb-10">
         <button
