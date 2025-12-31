@@ -1999,11 +1999,12 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
 
   // 4. 定義更新函式 (確保切換分頁後資料還在)
   function handleSummaryUpdate(field, value) {
-    updateProjectData({
-      ...projectData,
-      [field]: Number(value)
-    });
-  }
+  const numValue = value === "" ? 0 : Number(value); // 處理空字串
+  updateProjectData({
+    ...projectData,
+    [field]: numValue
+  });
+}
 
   /*************** 更新人工調整 ***************/
   function updateManualAdjust(field, value) {
