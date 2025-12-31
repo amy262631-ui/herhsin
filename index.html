@@ -2383,54 +2383,54 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
           </div>
         </div>
 
-        {/* 建議售價 + 預計利潤 並排區塊 */}
-        <div className="p-4 bg-gray-50 border-2 border-red-500 rounded flex justify-between items-end flex-wrap gap-4">
-          <div>
-            <div className="text-red-500 text-sm font-bold mb-1">建議售價</div>
-            <div className="text-red-600 font-bold text-2xl">
-              {suggestPrice.toLocaleString()} <span className="text-sm">元</span>
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="text-green-600 text-sm font-bold mb-1">預計利潤</div>
-            <div className="text-green-600 font-bold text-xl border-b-2 border-green-200 pb-1">
-              {profitAmount.toLocaleString()} <span className="text-sm text-gray-500">元</span>
-            </div>
-          </div>
-        </div>
+       {/* 🚀 建議售價 + 預計利潤 並排區塊 */}
+<div className="p-4 bg-gray-50 border-2 border-red-500 rounded flex justify-between items-end flex-wrap gap-4">
+  <div>
+    <div className="text-red-500 text-sm font-bold mb-1">建議售價</div>
+    <div className="text-red-600 font-bold text-2xl">
+      {suggestPrice.toLocaleString()} <span className="text-sm">元</span>
+    </div>
+  </div>
+  <div className="text-right">
+    <div className="text-green-600 text-sm font-bold mb-1">預計利潤</div>
+    <div className="text-green-600 font-bold text-xl border-b-2 border-green-200 pb-1">
+      {profitAmount.toLocaleString()} <span className="text-sm text-gray-500">元</span>
+    </div>
+  </div>
+</div>
 
-        {/* 🚀 議價底價試算區 (讓您在砍價時心裡有底) */}
-        <div className="mt-4 p-4 bg-blue-50 border-2 border-blue-400 rounded-lg shadow-inner">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-blue-700">💰</span>
-            <h4 className="font-bold text-blue-800">議價底價試算</h4>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-            <div>
-              <label className="text-xs font-bold text-blue-900 block mb-1">預計最底價輸入：</label>
-              <input 
-                type="number" 
-                value={floorPrice || ""} 
-                onChange={(e) => handleSummaryUpdate("floorPrice", e.target.value)}
-                className="border-2 border-blue-200 p-2 w-full rounded font-bold text-blue-900"
-                placeholder="輸入金額..."
-              />
-            </div>
-            <div className="text-center">
-              <div className="text-xs text-gray-500 font-bold mb-1">底價預計利潤</div>
-              <div className={`text-lg font-bold ${floorProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {Math.round(floorProfit).toLocaleString()} <span className="text-xs">元</span>
-              </div>
-            </div>
-            <div className="text-center">
-              <div className="text-xs text-gray-500 font-bold mb-1">底價實質毛利</div>
-              <div className={`text-lg font-bold ${floorProfitRate >= 10 ? 'text-blue-600' : 'text-orange-600'}`}>
-                {floorProfitRate.toFixed(1)} <span className="text-xs">%</span>
-              </div>
-            </div>
-          </div>
-        </div>
+{/* 🚀 議價底價試算區 */}
+<div className="mt-4 p-4 bg-blue-50 border-2 border-blue-400 rounded-lg shadow-inner">
+  <div className="flex items-center gap-2 mb-3">
+    <span className="text-blue-700">💰</span>
+    <h4 className="font-bold text-blue-800">議價底價試算</h4>
+  </div>
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+    <div>
+      <label className="text-xs font-bold text-blue-900 block mb-1">預計最底價輸入：</label>
+      <input 
+        type="number" 
+        /* 💡 確保這裡連動到 projectData.floorPrice */
+        value={floorPrice === 0 ? "" : floorPrice} 
+        onChange={(e) => handleSummaryUpdate("floorPrice", e.target.value)}
+        className="border-2 border-blue-200 p-2 w-full rounded font-bold text-blue-900"
+        placeholder="輸入金額..."
+      />
+    </div>
+    <div className="text-center">
+      <div className="text-xs text-gray-500 font-bold mb-1">底價預計利潤</div>
+      <div className={`text-lg font-bold ${floorProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+        {Math.round(floorProfit).toLocaleString()} <span className="text-xs">元</span>
       </div>
+    </div>
+    <div className="text-center">
+      <div className="text-xs text-gray-500 font-bold mb-1">底價實質毛利</div>
+      <div className={`text-lg font-bold ${floorProfitRate >= 10 ? 'text-blue-600' : 'text-orange-600'}`}>
+        {floorProfitRate.toFixed(1)} <span className="text-xs">%</span>
+      </div>
+    </div>
+  </div>
+</div>
       {/* 匯出 Excel + 列印 */}
       <div className="flex gap-3 print-hidden mt-6 pb-10">
         <button
@@ -2543,7 +2543,7 @@ function BackupArea({ projects, setProjects, setCurrentProject }) {
   }
 
   return (
-    <div className="bg-white p-4 rounded shadow mb-4 print-hidden"> }
+    <div className="bg-white p-4 rounded shadow mb-4 print-hidden"> 
   <h3 className="font-bold mb-2">工程備份 / 還原</h3>
 
       <div className="flex gap-3">
@@ -2731,7 +2731,7 @@ async function saveToCloud(projectName, projectDetail) {
     }
   }
 
-  React.useEffect(() => {
+ React.useEffect(() => {
     loadDB("material", CSV_URLS.material, setMaterialDB);
     loadDB("purchase", CSV_URLS.purchase, setPurchaseDB);
     loadDB("fabrication", CSV_URLS.fabrication, setFabricationDB);
@@ -2740,7 +2740,14 @@ async function saveToCloud(projectName, projectDetail) {
     loadProjectsFromCloud();
   }, []);
 
-  const projectData = projects[currentProject] || { allItems: [], manualAdjustDetail: {} };
+  // 🚀 整合後的定義：確保當 projects[currentProject] 不存在時，提供包含所有關鍵欄位的初始物件
+  const projectData = projects[currentProject] || { 
+    allItems: [], 
+    manualAdjustDetail: {},
+    adminRate: 15,
+    profitRate: 35,
+    floorPrice: 0 
+  };
 
  function updateProjectData(newData) {
     // 1. 立即標記為修改中，並在畫面顯示 (正在儲存您的修改)
