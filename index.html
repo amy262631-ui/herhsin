@@ -2039,23 +2039,51 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
     rows.push(["材料成本明細表"]);
     rows.push(["設備名稱", "分類", "規格", "長m", "寬m", "數量", "重量", "單價", "小計"]);
 
-    projectData.allItems
-      .filter((i) => i.type === "材料")
-      .forEach((i) =>
-        rows.push([
-          i.equipment || "",
-          i.category,
-          i.spec,
-          i.length || "",
-          i.width || "",
-          i.pcs,
-          i.weight || "",
-          i.price,
-          i.subtotal,
-        ])
-      );
-    rows.push(["合計", "", "", "", "", "", "", "", materialSum]);
-    rows.push([]);
+    // 1. 先列出所有明細列
+    const materialItems = projectData.allItems.filter((i) => i.type === "材料");
+    materialItems.forEach((i) =>
+      rows.push([
+        i.equipment || i.equipName || "", // 支援兩種可能的變數名
+        i.category,
+        i.spec,
+        i.length || "",
+        i.width || "",
+        i.pcs,
+        i.weight || "",
+        i.price,
+        i.subtotal,
+      ])
+    );
+
+    // 2. 加入材料總合計
+    rows.push(["材料明細合計", "", "", "", "", "", "", "", materialSum]);
+    rows.push([]); // 空行區隔
+
+    // 🚀 3. 新增：設備彙總統計 (Excel 版)
+    rows.push(["【材料 - 各設備彙總摘要】"]);
+    rows.push(["設備名稱", "", "", "", "", "", "設備總重量", "", "分項總成本"]);
+
+    // 計算分類加總邏輯
+    const matSummary = materialItems.reduce((acc, item) => {
+      const name = (item.equipment || item.equipName || "未分類").trim();
+      if (!acc[name]) acc[name] = { weight: 0, cost: 0 };
+      acc[name].weight += Number(item.weight || 0);
+      acc[name].cost += Number(item.subtotal || 0);
+      return acc;
+    }, {});
+
+    // 將彙總結果寫入 Excel 陣列
+    Object.entries(matSummary).forEach(([name, data]) => {
+      rows.push([
+        name, 
+        "", "", "", "", "", 
+        data.weight.toFixed(2), // 總重量保留兩位
+        "", 
+        data.cost // 分項總金額
+      ]);
+    });
+
+    rows.push([]); // 與下一個大類別區隔
 
     /************************************
      * 市購品
@@ -2063,20 +2091,45 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
     rows.push(["市購品成本明細表"]);
     rows.push(["設備名稱", "分類", "品項", "數量", "單價", "小計"]);
 
-    projectData.allItems
-      .filter((i) => i.type === "市購品")
-      .forEach((i) =>
-        rows.push([
-          i.equipment || "",
-          i.category,
-          i.spec,
-          i.qty,
-          i.price,
-          i.subtotal,
-        ])
-      );
-    rows.push(["合計", "", "", "", "", purchaseSum]);
-    rows.push([]);
+    // 1. 先列出所有市購品明細列
+    const purchaseItems = projectData.allItems.filter((i) => i.type === "市購品");
+    purchaseItems.forEach((i) =>
+      rows.push([
+        i.equipment || i.equipName || "", // 確保設備名稱欄位正確讀取
+        i.category,
+        i.spec,
+        i.qty,
+        i.price,
+        i.subtotal,
+      ])
+    );
+
+    // 2. 加入市購品總合計
+    rows.push(["市購品明細合計", "", "", "", "", purchaseSum]);
+    rows.push([]); // 空行區隔
+
+    // 🚀 3. 新增：市購品設備彙總統計 (Excel 版)
+    rows.push(["【市購品 - 各設備彙總摘要】"]);
+    rows.push(["設備名稱", "", "", "", "", "分項總成本"]);
+
+    // 計算市購品分類加總邏輯
+    const purSummary = purchaseItems.reduce((acc, item) => {
+      const name = (item.equipment || item.equipName || "未分類").trim();
+      if (!acc[name]) acc[name] = 0;
+      acc[name] += Number(item.subtotal || 0);
+      return acc;
+    }, {});
+
+    // 將彙總結果寫入 rows 陣列
+    Object.entries(purSummary).forEach(([name, totalCost]) => {
+      rows.push([
+        name, 
+        "", "", "", "", 
+        totalCost // 該設備的市購品總金額
+      ]);
+    });
+
+    rows.push([]); // 與下一個大類別區隔
 
     /************************************
      * 製作
