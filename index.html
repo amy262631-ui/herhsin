@@ -1006,6 +1006,49 @@ const selectedRow = React.useMemo(() => {
           })}
         </tbody>
       </table>
+      {/* 🚀 新增：市購品依設備彙總統計 */}
+      <div className="mt-8 mb-4">
+        <h3 className="text-md font-bold mb-2 text-gray-700 flex items-center">
+          <span className="w-1 h-5 bg-orange-500 mr-2"></span>
+          市購品設備成本彙總
+        </h3>
+        <div className="overflow-hidden border rounded-lg shadow-sm">
+          <table className="w-full text-sm text-left bg-white">
+            <thead className="bg-orange-50 text-orange-800 font-bold">
+              <tr>
+                <th className="p-2 border-b">設備名稱</th>
+                <th className="p-2 border-b text-right">市購品小計 (元)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {Object.entries(
+                // 假設您的市購品陣列名稱是 purchasedItems，請根據實際變數名修改
+                purchasedItems.reduce((acc, item) => {
+                  const name = (item.equipName || "未命名設備").trim();
+                  if (!acc[name]) acc[name] = 0;
+                  acc[name] += Number(item.subtotal) || 0;
+                  return acc;
+                }, {})
+              ).map(([name, totalCost]) => (
+                <tr key={name} className="hover:bg-gray-50">
+                  <td className="p-2 font-medium">{name}</td>
+                  <td className="p-2 text-right font-bold text-orange-700">
+                    {Math.round(totalCost).toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+              {/* 如果完全沒資料時顯示 */}
+              {purchasedItems.length === 0 && (
+                <tr>
+                  <td colSpan="2" className="p-4 text-center text-gray-400">尚無設備資料</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* --- 原本的市購品總金額合計 --- */}
 <div className="mt-4 p-3 bg-gray-50 border-t-2 border-orange-500 rounded text-right">
         <div className="text-lg font-bold text-orange-700">
           市購品總金額合計：{formatMoney(items.reduce((sum, i) => sum + (i.subtotal || 0), 0))} 元
