@@ -22,56 +22,50 @@
   
  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <style>
+ <style>
   body { background-color: #f3f4f6; }
-  
-  /* 平時正常顯示，列印時才會隱藏標記為 .print-hidden 的元素 */
   .print-hidden { display: block; }
 
   @media print {
-    /* 1. 徹底隱藏不需要的區塊：包含備份、連線狀態、導覽按鈕 */
+    /* 1. 徹底消失：確保備份區與按鈕完全不佔空間 */
     .print-hidden, nav, header, .tabs-container { 
       display: none !important; 
+      height: 0 !important;
+      margin: 0 !important;
+      padding: 0 !important;
     }
 
-    /* 2. 設定 A4 尺寸與極簡邊界 */
     @page {
       size: A4 portrait;
-      margin: 0.5cm; /* 縮小邊界以利容納更多內容 */
+      margin: 0.3cm; /* 極窄邊界 */
     }
 
-    /* 3. 強制縮放與背景設定 */
     body {
-      /* 因為您有圖表+五大成本+建議售價+底價區，建議設為 75%-78% 最保險 */
-      zoom: 78%; 
+      zoom: 75%; /* 🚀 降低到 75% 通常能完美解決 2 頁變 1 頁的問題 */
       background: white !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
 
-    /* 4. 強制圖表縮小（這是佔用空間的大戶） */
+    /* 2. 壓縮圖表高度 (這是最佔位的地方) */
     canvas, #summaryChart {
-      max-height: 220px !important; 
-      max-width: 100% !important;
+      max-height: 180px !important; /* 再縮小一點 */
       margin: 0 auto !important;
     }
 
-    /* 5. 移除陰影並簡化框線 */
-    .shadow, .rounded {
-      box-shadow: none !important;
-      border: 1px solid #eee !important;
-      margin-bottom: 5px !important; /* 縮小區塊間距 */
-    }
-
-    /* 6. 防止區塊被跨頁切斷 */
-    .bg-white, .border-red-500, .bg-blue-50 {
-      break-inside: avoid;
+    /* 3. 壓縮所有區塊的垂直間距 */
+    .mb-4, .mt-6, .py-4, .p-4 {
+      margin-top: 4px !important;
+      margin-bottom: 4px !important;
       padding-top: 5px !important;
       padding-bottom: 5px !important;
     }
 
-    /* 7. 針對「成本合計」那一行字體稍微縮小，確保不換行 */
-    .text-2xl { font-size: 1.5rem !important; }
+    /* 4. 防止區塊被切斷，並確保背景色印出 */
+    .bg-white, .bg-blue-50, .border-red-500 {
+      break-inside: avoid !important;
+      border: 1px solid #eee !important;
+    }
   }
 </style>
 </head>
@@ -2548,8 +2542,8 @@ function BackupArea({ projects, setProjects, setCurrentProject }) {
   }
 
   return (
-    <div className="print-hidden bg-white p-4 rounded shadow mb-4">
-      <h3 className="font-bold mb-2">工程備份 / 還原</h3>
+    <div className="bg-white p-4 rounded shadow mb-4 print-hidden"> }
+  <h3 className="font-bold mb-2">工程備份 / 還原</h3>
 
       <div className="flex gap-3">
         {/* 匯出 */}
@@ -2800,7 +2794,7 @@ async function saveToCloud(projectName, projectDetail) {
       <ProjectManager currentProject={currentProject} setCurrentProject={setCurrentProject} projects={projects} setProjects={setProjects} />
       <BackupArea projects={projects} setProjects={setProjects} setCurrentProject={setCurrentProject} />
 
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-4 print-hidden">
         {["材料", "市購品", "製作成本", "運輸費用", "現場安裝", "總表"].map(tab => (
           <button key={tab} onClick={() => setPage(tab)} className={"px-3 py-1 rounded border font-bold " + (page === tab ? "bg-blue-600 text-white border-blue-600 shadow-md" : "bg-white")}>{tab}</button>
         ))}
