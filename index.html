@@ -1944,12 +1944,12 @@ function InstallPage({ installDB, projectData, setProjectData }) {
   );
 }
 /****************************************************
- * PART 9 — SummaryPage（總表）- 完整復原與優化版
+ * PART 9 — SummaryPage（總表）- 終極完整修正版
  ****************************************************/
 function SummaryPage({ projectData, currentProject, updateProjectData }) {
   const chartRef = React.useRef(null);
 
-  /*************** 1. 基礎成本計算 (確保讀取金額) ***************/
+  /*************** 1. 成本小計計算 ***************/
   const sumByType = (type) => {
     return (projectData.allItems || [])
       .filter((i) => i.type === type)
@@ -1964,38 +1964,27 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
 
   const fiveTotal = materialSum + purchaseSum + fabSum + transSum + installSum;
 
-  /*************** 2. 人工調整 (記憶功能) ***************/
+  /*************** 2. 人工調整 ***************/
   const manualAdjustDetail = projectData.manualAdjustDetail || {
     material: 0, purchase: 0, fabrication: 0, transport: 0, install: 0,
   };
-
   const manualTotal = Object.values(manualAdjustDetail).reduce((a, b) => a + Number(b || 0), 0);
-  
-  // 核心成本合計 (五大類 + 人工調整)
   const finalCost = fiveTotal + manualTotal; 
 
-  /*************** 3. 管銷與毛利計算 (正確滾算) ***************/
+  /*************** 3. 管銷 / 毛利 / 售價 ***************/
   const adminRate = projectData.adminRate ?? 15;
   const profitRate = projectData.profitRate ?? 35;
   const floorPrice = projectData.floorPrice ?? 0;
 
-  // 管銷費 = 成本合計 * 管銷率
   const adminFee = Math.round(finalCost * (adminRate / 100));
-  
-  // 最終總成本 (含管銷費)
   const totalCostWithAdmin = finalCost + adminFee;
-
-  // 建議售價 = 最終總成本 / (1 - 毛利率)
   const suggestPrice = Math.round(totalCostWithAdmin / (1 - profitRate / 100));
-  
-  // 預計利潤 = 建議售價 - 最終總成本
   const profitAmount = suggestPrice - totalCostWithAdmin;
 
-  // 議價底價分析
   const floorProfit = floorPrice > 0 ? floorPrice - totalCostWithAdmin : 0;
   const floorProfitRate = floorPrice > 0 ? (floorProfit / floorPrice) * 100 : 0;
 
-  /*************** 4. 更新函式 (同步雲端) ***************/
+  /*************** 4. 數據更新函式 ***************/
   function handleSummaryUpdate(field, value) {
     updateProjectData({ ...projectData, [field]: value === "" ? 0 : Number(value) });
   }
@@ -2005,20 +1994,18 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
     updateProjectData({ ...projectData, manualAdjustDetail: newDetail });
   }
 
-  /*************** 5. 圓餅圖 (復原百分比標籤) ***************/
+  /*************** 5. 圓餅圖 (復原百分比) ***************/
   React.useEffect(() => {
     const ctx = document.getElementById("summaryChart");
     if (!ctx) return;
     if (window.summaryChart instanceof Chart) window.summaryChart.destroy();
 
-    const dataValues = [materialSum, purchaseSum, fabSum, transSum, installSum];
-    
     window.summaryChart = new Chart(ctx, {
       type: "pie",
       data: {
         labels: ["材料", "市購品", "製作", "運輸", "安裝"],
         datasets: [{
-          data: dataValues,
+          data: [materialSum, purchaseSum, fabSum, transSum, installSum],
           backgroundColor: ["#4fa3d1", "#ffcc66", "#66cc99", "#ff6666", "#9999ff"],
         }],
       },
@@ -2028,7 +2015,7 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
         plugins: {
           legend: { position: "bottom" },
           datalabels: {
-            display: true, // 🚀 強制顯示百分比標籤
+            display: true,
             color: "#000",
             font: { weight: "bold", size: 14 },
             formatter: (value, context) => {
@@ -2042,16 +2029,44 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
     });
   }, [materialSum, purchaseSum, fabSum, transSum, installSum]);
 
+  /*************** 🚀 6. 補回遺失的 exportExcel 函式 ***************/
+  function exportExcel() {
+    if (typeof XLSX === 'undefined') {
+      alert("請確保已載入 XLSX 套件");
+      return;
+    }
+    const wb = XLSX.utils.book_new();
+    const today = new Date();
+    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+    const fileName = `${dateStr}-${currentProject || "工程"}-成本分析.xlsx`;
+    const rows = [];
+
+    rows.push(["【成本總表摘要】"]);
+    rows.push(["項目", "金額"]);
+    rows.push(["五大成本小計", fiveTotal]);
+    rows.push(["人工調整小計", manualTotal]);
+    rows.push(["成本合計", finalCost]);
+    rows.push(["管銷率(%)", adminRate]);
+    rows.push(["管銷費", adminFee]);
+    rows.push(["最終總成本", totalCostWithAdmin]);
+    rows.push(["毛利率(%)", profitRate]);
+    rows.push(["建議售價", suggestPrice]);
+    rows.push(["預計利潤", profitAmount]);
+    rows.push([]);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, "成本分析總表");
+    XLSX.writeFile(wb, fileName);
+  }
+
+  /*************** 7. UI 渲染 ***************/
   return (
     <div className="p-4 max-w-5xl mx-auto">
       <h2 className="text-2xl font-bold mb-4">成本分析總表</h2>
-      
-      {/* 圓餅圖區塊 */}
       <div className="w-full h-80 mb-6 bg-white rounded shadow p-2">
         <canvas id="summaryChart"></canvas>
       </div>
 
-      {/* 五大成本與調整區 */}
       <div className="bg-white p-4 rounded shadow mb-4">
         <h3 className="font-bold text-lg mb-4 border-b pb-2">五大成本 + 人工調整</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-2">
@@ -2064,85 +2079,60 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
           ].map(item => (
             <React.Fragment key={item.key}>
               <div className="flex justify-between items-center py-1">
-                <span className="text-gray-700">{item.label}：{item.val.toLocaleString()}</span>
+                <span className="font-bold">{item.label}：{item.val.toLocaleString()}</span>
               </div>
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs text-gray-400 whitespace-nowrap">人工調整：</span>
+                <span className="text-xs text-gray-400">人工調整：</span>
                 <input
                   type="number"
                   value={manualAdjustDetail[item.key] || ""}
                   onChange={(e) => updateManualAdjust(item.key, e.target.value)}
-                  className="border-b w-full focus:border-blue-500 outline-none text-right"
+                  className="border-b w-full text-right font-bold"
                 />
               </div>
             </React.Fragment>
           ))}
         </div>
-        <div className="mt-4 pt-4 border-t text-right">
-          <p className="text-gray-500 text-sm">人工調整小計：{manualTotal.toLocaleString()}</p>
+        <div className="mt-4 text-right">
           <p className="font-bold text-xl text-blue-700">成本合計：{finalCost.toLocaleString()} 元</p>
         </div>
       </div>
 
-      {/* 計算與售價區 */}
       <div className="bg-white p-4 rounded shadow mb-4">
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
-            <label className="font-bold text-sm block mb-1 text-gray-600">管銷(%)</label>
+            <label className="font-bold text-sm block">管銷(%)</label>
             <input type="number" value={adminRate} onChange={(e)=>handleSummaryUpdate("adminRate", e.target.value)} className="border p-2 w-full rounded font-bold" />
-            <p className="text-xs text-blue-500 mt-1">管銷金額：{adminFee.toLocaleString()} 元</p>
           </div>
           <div>
-            <label className="font-bold text-sm block mb-1 text-gray-600">預計毛利率(%)</label>
+            <label className="font-bold text-sm block">毛利率(%)</label>
             <input type="number" value={profitRate} onChange={(e)=>handleSummaryUpdate("profitRate", e.target.value)} className="border p-2 w-full rounded font-bold text-blue-600" />
-            <p className="font-bold text-xs mt-1">最終總成本(含管銷)：{totalCostWithAdmin.toLocaleString()} 元</p>
           </div>
         </div>
 
-        {/* 售價紅框 */}
         <div className="p-4 bg-red-50 border-2 border-red-500 rounded flex justify-between items-center mb-4">
-          <div>
-            <div className="text-red-500 text-xs font-bold mb-1">建議售價</div>
-            <div className="text-red-600 font-black text-3xl">{suggestPrice.toLocaleString()} 元</div>
-          </div>
-          <div className="text-right text-green-700">
-            <div className="text-xs font-bold mb-1">預計毛利額</div>
-            <div className="font-black text-2xl">{profitAmount.toLocaleString()} 元</div>
-          </div>
+          <div><div className="text-red-500 text-xs font-bold">建議售價</div><div className="text-red-600 font-black text-3xl">{suggestPrice.toLocaleString()} 元</div></div>
+          <div className="text-right text-green-700"><div className="text-xs font-bold">預計毛利額</div><div className="font-black text-2xl">{profitAmount.toLocaleString()} 元</div></div>
         </div>
 
-        {/* 議價藍框 */}
         <div className="p-4 bg-blue-50 border-2 border-blue-400 rounded-lg">
-          <h4 className="font-bold text-blue-800 text-sm mb-3">🛡️ 議價底價分析</h4>
+          <h4 className="font-bold text-blue-800 text-sm mb-3">💰 議價底價分析</h4>
           <div className="grid grid-cols-3 gap-4 items-center">
-            <input 
-              type="number" 
-              value={floorPrice || ""} 
-              onChange={(e) => handleSummaryUpdate("floorPrice", e.target.value)}
-              className="border-2 border-blue-200 p-2 rounded font-bold w-full"
-              placeholder="輸入底價..."
-            />
-            <div className="text-center">
-              <div className="text-[10px] text-gray-400">底價利潤</div>
-              <div className={`font-bold ${floorProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>{Math.round(floorProfit).toLocaleString()}</div>
-            </div>
-            <div className="text-center">
-              <div className="text-[10px] text-gray-400">實質毛利</div>
-              <div className="font-bold text-blue-700">{floorProfitRate.toFixed(1)}%</div>
-            </div>
+            <input type="number" value={floorPrice || ""} onChange={(e) => handleSummaryUpdate("floorPrice", e.target.value)} className="border-2 border-blue-200 p-2 rounded font-bold w-full" placeholder="底價..." />
+            <div className="text-center font-bold text-green-600">{Math.round(floorProfit).toLocaleString()}</div>
+            <div className="text-center font-bold text-blue-700">{floorProfitRate.toFixed(1)}%</div>
           </div>
         </div>
       </div>
 
-     {/* 按鈕區 */}
+      {/* 按鈕區 */}
       <div className="flex gap-4 print-hidden pb-10">
-        <button onClick={exportExcel} className="flex-1 bg-green-600 text-white py-3 rounded font-bold shadow hover:bg-green-700">匯出 Excel</button>
-        <button onClick={() => window.print()} className="flex-1 bg-gray-700 text-white py-3 rounded font-bold shadow hover:bg-gray-800">列印總表 (A4)</button>
+        <button onClick={exportExcel} className="flex-1 bg-green-600 text-white py-3 rounded font-bold shadow hover:bg-green-700 transition-all">📊 匯出 Excel</button>
+        <button onClick={() => window.print()} className="flex-1 bg-gray-700 text-white py-3 rounded font-bold shadow hover:bg-gray-800 transition-all">🖨️ 列印總表 (A4)</button>
       </div>
     </div>
   );
 }
-
 /****************************************************
  * PART X — BackupArea（備份與還原）
  ****************************************************/
