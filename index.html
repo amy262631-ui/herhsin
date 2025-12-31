@@ -2194,26 +2194,7 @@ function App() {
   const [currentByteCount, setCurrentByteCount] = React.useState(0);
   const [storageUsage, setStorageUsage] = React.useState(0);
 
-  // 🚀 【新增位置】：將 loadProjectsFromCloud 貼在這裡
-  const loadProjectsFromCloud = async () => {
-    setIsSyncing(true);
-    try {
-      const response = await fetch(CLOUD_SCRIPT_URL); // 確保你的 GAS URL 正確
-      const cloudData = await response.json();
-      
-      if (cloudData && typeof cloudData === 'object') {
-        setProjects(cloudData);
-        // 同步更新本地 LocalStorage，讓手機下次沒網路也能開
-        localStorage.setItem("herhsin_projects", JSON.stringify(cloudData)); 
-        console.log("✅ 雲端資料同步成功");
-      }
-    } catch (err) {
-      console.error("❌ 雲端讀取失敗", err);
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
+  
   // 🚀 確保在網頁開啟時，自動執行一次讀取
   React.useEffect(() => {
     // 原有的資料庫載入邏輯...
