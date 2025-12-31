@@ -2194,6 +2194,36 @@ function App() {
   const [currentByteCount, setCurrentByteCount] = React.useState(0);
   const [storageUsage, setStorageUsage] = React.useState(0);
 
+  // 🚀 【新增位置】：將 loadProjectsFromCloud 貼在這裡
+  const loadProjectsFromCloud = async () => {
+    setIsSyncing(true);
+    try {
+      const response = await fetch(CLOUD_SCRIPT_URL); // 確保你的 GAS URL 正確
+      const cloudData = await response.json();
+      
+      if (cloudData && typeof cloudData === 'object') {
+        setProjects(cloudData);
+        // 同步更新本地 LocalStorage，讓手機下次沒網路也能開
+        localStorage.setItem("herhsin_projects", JSON.stringify(cloudData)); 
+        console.log("✅ 雲端資料同步成功");
+      }
+    } catch (err) {
+      console.error("❌ 雲端讀取失敗", err);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // 🚀 確保在網頁開啟時，自動執行一次讀取
+  React.useEffect(() => {
+    // 原有的資料庫載入邏輯...
+    loadDB("material", CSV_URLS.material, setMaterialDB);
+    // ...
+    
+    // 執行雲端載入
+    loadProjectsFromCloud();
+  }, []);
+
   // 五大資料庫 State
   const [materialDB, setMaterialDB] = React.useState([]);
   const [purchaseDB, setPurchaseDB] = React.useState([]);
@@ -2214,7 +2244,10 @@ async function loadProjectsFromCloud() {
       const proj = rawCloudData[name];
       restoredProjects[name] = {
         manualAdjustDetail: proj.mad || { ...defaultManualAdjust },
-        // 🚀 修改還原對應邏輯
+        // 🚀 修改點：還原這三個關鍵欄位
+        adminRate: Number(proj.ar || 15),
+        profitRate: Number(proj.pr || 35),
+        floorPrice: Number(proj.fp || 0),
 allItems: (proj.allItems || []).map(i => {
   const typeMap = { "M": "材料", "P": "市購品", "F": "製作成本", "T": "運輸費用", "I": "現場安裝" };
   return {
@@ -2234,10 +2267,9 @@ allItems: (proj.allItems || []).map(i => {
       };
     });
 
-    setProjects(restoredProjects);
-    saveProjects(restoredProjects);
+ setProjects(restoredProjects);
+    saveProjects(restoredProjects); // 存入手機 LocalStorage
     setHasUnsavedChanges(false);
-    console.log("✅ 雲端資料還原成功");
   } catch (e) { console.error("雲端載入失敗", e); }
   finally { setIsSyncing(false); }
 }
@@ -2263,9 +2295,13 @@ async function saveToCloud(projectName, projectDetail) {
       };
     });
 
+    // 🚀 修改點：將 adminRate, profitRate, floorPrice 加入 leanData 進行壓縮
     const leanData = {
       allItems: slimItems,
-      mad: projectDetail.manualAdjustDetail || {}
+      mad: projectDetail.manualAdjustDetail || {},
+      ar: Number(projectDetail.adminRate || 15),   // adminRate 縮寫為 ar
+      pr: Number(projectDetail.profitRate || 35),  // profitRate 縮寫為 pr
+      fp: Number(projectDetail.floorPrice || 0)    // floorPrice 縮寫為 fp
     };
 
     const payload = JSON.stringify({ projectName: projectName.toString(), data: leanData });
