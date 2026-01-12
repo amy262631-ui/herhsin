@@ -2093,8 +2093,15 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
             </React.Fragment>
           ))}
         </div>
-        <div className="mt-4 text-right">
-          <p className="font-bold text-xl text-blue-700">成本合計：{finalCost.toLocaleString()} 元</p>
+       {/* 🚀 修改點：新增顯示管銷金額 */}
+        <div className="mt-4 pt-4 border-t border-dashed space-y-1 text-right">
+          <p className="text-gray-600 text-sm">成本合計：{finalCost.toLocaleString()} 元</p>
+          <p className="text-orange-600 font-bold">
+            + 管銷費用 ({adminRate}%)：{adminFee.toLocaleString()} 元
+          </p>
+          <p className="font-bold text-xl text-blue-700">
+            最終總成本：{totalCostWithAdmin.toLocaleString()} 元
+          </p>
         </div>
       </div>
 
