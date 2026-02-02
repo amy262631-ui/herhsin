@@ -2333,9 +2333,11 @@ async function saveToCloud(projectName, projectDetail) {
     console.error("❌ 同步連線失敗:", e); 
   }
 }
-  // 🚀🚀🚀 在這裡新增 deleteFromCloud 函式 🚀🚀🚀
+// --- ☁️ 雲端刪除工程（加強版，含除錯訊息）---
 async function deleteFromCloud(projectName) {
   if (!projectName) return;
+  
+  console.log(`🗑️ 準備刪除雲端工程: ${projectName}`);
   setIsSyncing(true);
 
   try {
@@ -2343,18 +2345,22 @@ async function deleteFromCloud(projectName) {
       projectName: projectName.toString(), 
       action: "delete" 
     });
+    
+    console.log("發送刪除請求 Payload:", payload);
 
-    await fetch(GAS_API_URL, { 
+    const response = await fetch(GAS_API_URL, { 
       method: "POST", 
       body: payload,
       mode: 'no-cors', 
       headers: { 'Content-Type': 'text/plain' } 
     });
 
+    console.log("刪除請求已發送，等待雲端處理...");
+
     setTimeout(() => {
       setIsSyncing(false);
       console.log(`✅ 已從雲端刪除工程: ${projectName}`);
-    }, 1500);
+    }, 2000); // 改成 2 秒
 
   } catch (e) { 
     setIsSyncing(false);
