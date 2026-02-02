@@ -218,17 +218,24 @@ function ProjectManager({ currentProject, setCurrentProject, projects, setProjec
     saveProjects(updated);
   }
 
-  // 刪除工程
+  // 🚀 修改：刪除工程（含雲端同步）
   function deleteProject(name) {
-    if (!window.confirm(`確定刪除工程「${name}」？`)) return;
+    if (!window.confirm(`確定刪除工程「${name}」？此操作無法復原！`)) return;
 
+    // 1. 從 state 中刪除
     const updated = { ...projects };
     delete updated[name];
 
+    // 2. 更新當前工程（切換到第一個，或空）
     const next = Object.keys(updated)[0] || "";
     setProjects(updated);
     setCurrentProject(next);
+
+    // 3. 儲存到 localStorage
     saveProjects(updated);
+
+    // 🚀 4. 同步刪除到雲端（關鍵新增）
+    deleteFromCloud(name);
   }
 
   return (
@@ -236,7 +243,6 @@ function ProjectManager({ currentProject, setCurrentProject, projects, setProjec
       <h2 className="text-lg font-bold mb-3">工程管理</h2>
 
       <div className="flex flex-wrap gap-2">
-
         {Object.keys(projects).map(key => (
           <button
             key={key}
@@ -2325,6 +2331,34 @@ async function saveToCloud(projectName, projectDetail) {
   } catch (e) { 
     setIsSyncing(false);
     console.error("❌ 同步連線失敗:", e); 
+  }
+}
+  // 🚀🚀🚀 在這裡新增 deleteFromCloud 函式 🚀🚀🚀
+async function deleteFromCloud(projectName) {
+  if (!projectName) return;
+  setIsSyncing(true);
+
+  try {
+    const payload = JSON.stringify({ 
+      projectName: projectName.toString(), 
+      action: "delete" 
+    });
+
+    await fetch(GAS_API_URL, { 
+      method: "POST", 
+      body: payload,
+      mode: 'no-cors', 
+      headers: { 'Content-Type': 'text/plain' } 
+    });
+
+    setTimeout(() => {
+      setIsSyncing(false);
+      console.log(`✅ 已從雲端刪除工程: ${projectName}`);
+    }, 1500);
+
+  } catch (e) { 
+    setIsSyncing(false);
+    console.error("❌ 雲端刪除失敗:", e); 
   }
 }
   // --- 📦 資料庫讀取 (方法 B：每次重整都強制更新) ---
