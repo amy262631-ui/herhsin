@@ -193,8 +193,7 @@ function loadProjects() {
  ****************************************************/
 
 // 多工程管理
-function ProjectManager({ currentProject, setCurrentProject, projects, setProjects }) {
-
+function ProjectManager({ currentProject, setCurrentProject, projects, setProjects, deleteFromCloud }) {
   // 新增工程
   function addProject() {
     const name = prompt("請輸入工程名稱：");
@@ -219,24 +218,28 @@ function ProjectManager({ currentProject, setCurrentProject, projects, setProjec
   }
 
   // 🚀 修改：刪除工程（含雲端同步）
-  function deleteProject(name) {
-    if (!window.confirm(`確定刪除工程「${name}」？此操作無法復原！`)) return;
+  async function deleteProject(name) {
+  if (!window.confirm(`確定刪除工程「${name}」？此操作無法復原！`)) return;
 
-    // 1. 從 state 中刪除
-    const updated = { ...projects };
-    delete updated[name];
+  // 1. 先刪本地（畫面立即反應）
+  const updated = { ...projects };
+  delete updated[name];
 
-    // 2. 更新當前工程（切換到第一個，或空）
-    const next = Object.keys(updated)[0] || "";
-    setProjects(updated);
-    setCurrentProject(next);
+  // 2. 更新目前工程
+  const next = Object.keys(updated)[0] || "";
+  setProjects(updated);
+  setCurrentProject(next);
 
-    // 3. 儲存到 localStorage
-    saveProjects(updated);
+  // 3. 存本地
+  saveProjects(updated);
 
-    // 🚀 4. 同步刪除到雲端（關鍵新增）
-    deleteFromCloud(name);
+  // 4. 刪雲端
+  try {
+    await deleteFromCloud(name);
+  } catch (err) {
+    console.error("雲端刪除失敗：", err);
   }
+}
 
   return (
     <div className="bg-white p-4 rounded shadow mb-4 print-hidden">
@@ -2470,7 +2473,13 @@ async function deleteFromCloud(projectName) {
   </button>
 </div>
    
-      <ProjectManager currentProject={currentProject} setCurrentProject={setCurrentProject} projects={projects} setProjects={setProjects} />
+      <ProjectManager currentProject={currentProject} setCurrentProject={setCurrentProject} projects={projects} setProjects={se<ProjectManager
+  currentProject={currentProject}
+  setCurrentProject={setCurrentProject}
+  projects={projects}
+  setProjects={setProjects}
+  deleteFromCloud={deleteFromCloud}
+/>tProjects} />
       <BackupArea projects={projects} setProjects={setProjects} setCurrentProject={setCurrentProject} />
 
       <div className="flex gap-2 mb-4 print-hidden">
