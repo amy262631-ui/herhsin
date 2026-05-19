@@ -698,7 +698,7 @@ function MaterialsPage({ materialDB, projectData, setProjectData }) {
               {Object.entries(
                 materialItems.reduce((acc, item) => {
                   // 抓取設備名稱，若空白則歸類為 "未命名設備"
-                  const name = (item.equipName || "未命名設備").trim();
+                  const name = (item.equipName || "設備").trim();
                   if (!acc[name]) acc[name] = { weight: 0, cost: 0 };
                   acc[name].weight += Number(item.weight) || 0;
                   acc[name].cost += Number(item.subtotal) || 0;
@@ -1071,7 +1071,7 @@ const selectedRow = React.useMemo(() => {
               {Object.entries(
                 // 🚀 關鍵修正：這裡使用 items 而不是 purchasedItems
                 items.reduce((acc, item) => {
-                  const name = (item.equipment || "未命名設備").trim();
+                  const name = (item.equipName || "設備").trim();
                   if (!acc[name]) acc[name] = 0;
                   acc[name] += Number(item.subtotal) || 0;
                   return acc;
@@ -2078,30 +2078,238 @@ function SummaryPage({ projectData, currentProject, updateProjectData }) {
 
       <div className="bg-white p-4 rounded shadow mb-4">
         <h3 className="font-bold text-lg mb-4 border-b pb-2">五大成本 + 人工調整</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-2">
-          {[
-            { label: "材料成本", val: materialSum, key: "material" },
-            { label: "市購品成本", val: purchaseSum, key: "purchase" },
-            { label: "製作成本", val: fabSum, key: "fabrication" },
-            { label: "運輸費用", val: transSum, key: "transport" },
-            { label: "現場安裝成本", val: installSum, key: "install" }
-          ].map(item => (
-            <React.Fragment key={item.key}>
-              <div className="flex justify-between items-center py-1">
-                <span className="font-bold">{item.label}：{item.val.toLocaleString()}</span>
+        {/* 可展開明細區塊 */}
+{(() => {
+  const [openPanel, setOpenPanel] = React.useState(null);
+
+  // 材料：依設備分組
+  const materialItems = (projectData.allItems || []).filter(i => i.type === "材料");
+  const materialByEquip = Object.entries(
+    materialItems.reduce((acc, i) => {
+      const name = (i.equipName || "未命名設備").trim();
+      if (!acc[name]) acc[name] = { weight: 0, cost: 0 };
+      acc[name].weight += Number(i.weight) || 0;
+      acc[name].cost += Number(i.subtotal) || 0;
+      return acc;
+    }, {})
+  );
+
+  // 市購品：全部列出
+  const purchaseItems = (projectData.allItems || []).filter(i => i.type === "市購品");
+
+  // 製作成本：全部列出
+  const fabItems = (projectData.allItems || []).filter(i => i.type === "製作成本");
+
+  // 運輸費用：全部列出
+  const transItems = (projectData.allItems || []).filter(i => i.type === "運輸費用");
+
+  // 現場安裝：全部列出
+  const installItems = (projectData.allItems || []).filter(i => i.type === "現場安裝");
+
+  const costRows = [
+    {
+      label: "材料成本", val: materialSum, key: "material",
+      color: "blue",
+      renderDetail: () => (
+        <table className="w-full text-xs border mt-1">
+          <thead className="bg-blue-50">
+            <tr>
+              <th className="border px-2 py-1 text-left">設備名稱</th>
+              <th className="border px-2 py-1 text-right">重量(kg)</th>
+              <th className="border px-2 py-1 text-right">金額(元)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {materialByEquip.map(([name, d]) => (
+              <tr key={name} className="hover:bg-blue-50">
+                <td className="border px-2 py-1">{name}</td>
+                <td className="border px-2 py-1 text-right">{d.weight.toFixed(2)}</td>
+                <td className="border px-2 py-1 text-right font-bold">{Math.round(d.cost).toLocaleString()}</td>
+              </tr>
+            ))}
+            {materialByEquip.length === 0 && (
+              <tr><td colSpan="3" className="text-center text-gray-400 py-2">無資料</td></tr>
+            )}
+          </tbody>
+        </table>
+      )
+    },
+    {
+      label: "市購品成本", val: purchaseSum, key: "purchase",
+      color: "orange",
+      renderDetail: () => (
+        <table className="w-full text-xs border mt-1">
+          <thead className="bg-orange-50">
+            <tr>
+              <th className="border px-2 py-1 text-left">設備</th>
+              <th className="border px-2 py-1 text-left">分類</th>
+              <th className="border px-2 py-1 text-left">品項</th>
+              <th className="border px-2 py-1 text-right">數量</th>
+              <th className="border px-2 py-1 text-right">金額(元)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {purchaseItems.map((i, idx) => (
+              <tr key={idx} className="hover:bg-orange-50">
+                <td className="border px-2 py-1">{i.equipment || "—"}</td>
+                <td className="border px-2 py-1">{i.category}</td>
+                <td className="border px-2 py-1">{i.spec}</td>
+                <td className="border px-2 py-1 text-right">{i.qty}</td>
+                <td className="border px-2 py-1 text-right font-bold">{(i.subtotal || 0).toLocaleString()}</td>
+              </tr>
+            ))}
+            {purchaseItems.length === 0 && (
+              <tr><td colSpan="5" className="text-center text-gray-400 py-2">無資料</td></tr>
+            )}
+          </tbody>
+        </table>
+      )
+    },
+    {
+      label: "製作成本", val: fabSum, key: "fabrication",
+      color: "green",
+      renderDetail: () => (
+        <table className="w-full text-xs border mt-1">
+          <thead className="bg-green-50">
+            <tr>
+              <th className="border px-2 py-1 text-left">設備</th>
+              <th className="border px-2 py-1 text-left">分類</th>
+              <th className="border px-2 py-1 text-left">項目</th>
+              <th className="border px-2 py-1 text-right">數量</th>
+              <th className="border px-2 py-1 text-right">金額(元)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {fabItems.map((i, idx) => (
+              <tr key={idx} className="hover:bg-green-50">
+                <td className="border px-2 py-1">{i.equipment || "—"}</td>
+                <td className="border px-2 py-1">{i.category}</td>
+                <td className="border px-2 py-1">{i.spec}</td>
+                <td className="border px-2 py-1 text-right">{i.qty}</td>
+                <td className="border px-2 py-1 text-right font-bold">{(i.subtotal || 0).toLocaleString()}</td>
+              </tr>
+            ))}
+            {fabItems.length === 0 && (
+              <tr><td colSpan="5" className="text-center text-gray-400 py-2">無資料</td></tr>
+            )}
+          </tbody>
+        </table>
+      )
+    },
+    {
+      label: "運輸費用", val: transSum, key: "transport",
+      color: "red",
+      renderDetail: () => (
+        <table className="w-full text-xs border mt-1">
+          <thead className="bg-red-50">
+            <tr>
+              <th className="border px-2 py-1 text-left">分類</th>
+              <th className="border px-2 py-1 text-left">規格</th>
+              <th className="border px-2 py-1 text-left">地區</th>
+              <th className="border px-2 py-1 text-right">趟數</th>
+              <th className="border px-2 py-1 text-right">金額(元)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {transItems.map((i, idx) => (
+              <tr key={idx} className="hover:bg-red-50">
+                <td className="border px-2 py-1">{i.category}</td>
+                <td className="border px-2 py-1">{i.spec}</td>
+                <td className="border px-2 py-1">{i.region}</td>
+                <td className="border px-2 py-1 text-right">{i.qty}</td>
+                <td className="border px-2 py-1 text-right font-bold">{(i.subtotal || 0).toLocaleString()}</td>
+              </tr>
+            ))}
+            {transItems.length === 0 && (
+              <tr><td colSpan="5" className="text-center text-gray-400 py-2">無資料</td></tr>
+            )}
+          </tbody>
+        </table>
+      )
+    },
+    {
+      label: "現場安裝成本", val: installSum, key: "install",
+      color: "purple",
+      renderDetail: () => (
+        <table className="w-full text-xs border mt-1">
+          <thead className="bg-purple-50">
+            <tr>
+              <th className="border px-2 py-1 text-left">設備</th>
+              <th className="border px-2 py-1 text-left">項目</th>
+              <th className="border px-2 py-1 text-right">數量</th>
+              <th className="border px-2 py-1 text-right">單價</th>
+              <th className="border px-2 py-1 text-right">金額(元)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {installItems.map((i, idx) => (
+              <tr key={idx} className="hover:bg-purple-50">
+                <td className="border px-2 py-1">{i.equipment || "—"}</td>
+                <td className="border px-2 py-1">{i.spec}</td>
+                <td className="border px-2 py-1 text-right">{i.qty}</td>
+                <td className="border px-2 py-1 text-right">{(i.price || 0).toLocaleString()}</td>
+                <td className="border px-2 py-1 text-right font-bold">{(i.subtotal || 0).toLocaleString()}</td>
+              </tr>
+            ))}
+            {installItems.length === 0 && (
+              <tr><td colSpan="5" className="text-center text-gray-400 py-2">無資料</td></tr>
+            )}
+          </tbody>
+        </table>
+      )
+    },
+  ];
+
+  const colorMap = {
+    blue:   { border: "border-blue-300",   bg: "bg-blue-600",   text: "text-blue-700",   light: "bg-blue-50" },
+    orange: { border: "border-orange-300", bg: "bg-orange-500", text: "text-orange-700", light: "bg-orange-50" },
+    green:  { border: "border-green-300",  bg: "bg-green-600",  text: "text-green-700",  light: "bg-green-50" },
+    red:    { border: "border-red-300",    bg: "bg-red-500",    text: "text-red-700",    light: "bg-red-50" },
+    purple: { border: "border-purple-300", bg: "bg-purple-600", text: "text-purple-700", light: "bg-purple-50" },
+  };
+
+  return (
+    <div className="space-y-3">
+      {costRows.map(row => {
+        const isOpen = openPanel === row.key;
+        const c = colorMap[row.color];
+        return (
+          <div key={row.key} className={`border rounded-lg overflow-hidden ${c.border}`}>
+            {/* 標題列 */}
+            <div className={`flex items-center justify-between px-3 py-2 ${c.light}`}>
+              <div className="flex items-center gap-3 flex-1">
+                <span className="font-bold text-gray-700 w-32">{row.label}</span>
+                <span className={`font-black text-base ${c.text}`}>{row.val.toLocaleString()} 元</span>
               </div>
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-400">人工調整：</span>
                 <input
                   type="number"
-                  value={manualAdjustDetail[item.key] || ""}
-                  onChange={(e) => updateManualAdjust(item.key, e.target.value)}
-                  className="border-b w-full text-right font-bold"
+                  value={manualAdjustDetail[row.key] || ""}
+                  onChange={(e) => updateManualAdjust(row.key, e.target.value)}
+                  className="border-b w-28 text-right font-bold bg-transparent text-sm px-1"
+                  placeholder="0"
                 />
+                <button
+                  onClick={() => setOpenPanel(isOpen ? null : row.key)}
+                  className={`ml-2 px-2 py-1 rounded text-xs font-bold text-white ${c.bg} transition-all`}
+                >
+                  {isOpen ? "▲ 收起" : "▼ 明細"}
+                </button>
               </div>
-            </React.Fragment>
-          ))}
-        </div>
+            </div>
+            {/* 展開明細 */}
+            {isOpen && (
+              <div className="px-3 pb-3 bg-white">
+                {row.renderDetail()}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+})()}
        {/* 🚀 修改點：新增顯示管銷金額 */}
         <div className="mt-4 pt-4 border-t border-dashed space-y-1 text-right">
           <p className="text-gray-600 text-sm">成本合計：{finalCost.toLocaleString()} 元</p>
