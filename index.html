@@ -44,25 +44,26 @@
     }
 
     html, body {
-      zoom: 68%;
+      zoom: 100%;
       background: white !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
 
-    /* 2. 最外層容器去掉 padding */
+    /* 2. 最外層容器撐滿寬度，去掉 max-width 限制 */
     .p-4.max-w-5xl {
-      padding: 0 !important;
+      padding: 4px !important;
+      max-width: 100% !important;
+      width: 100% !important;
     }
-
     /* 3. 圓餅圖容器：縮小高度，不要留白 */
-    #chartWrapper {
-      height: 160px !important;
-      margin-bottom: 4px !important;
-      padding: 2px !important;
+   #chartWrapper {
+      height: 200px !important;
+      margin-bottom: 6px !important;
+      padding: 4px !important;
     }
     canvas, #summaryChart {
-      max-height: 150px !important;
+      max-height: 190px !important;
       width: auto !important;
     }
 
