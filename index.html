@@ -743,7 +743,7 @@ function MaterialsPage({ materialDB, projectData, setProjectData }) {
               {Object.entries(
                 materialItems.reduce((acc, item) => {
                   // 抓取設備名稱，若空白則歸類為 "未命名設備"
-                  const name = (item.equipName || "設備").trim();
+                  const name = (item.equipment || item.equipName || "設備").trim();
                   if (!acc[name]) acc[name] = { weight: 0, cost: 0 };
                   acc[name].weight += Number(item.weight) || 0;
                   acc[name].cost += Number(item.subtotal) || 0;
