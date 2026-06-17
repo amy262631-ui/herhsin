@@ -2501,12 +2501,6 @@ function App() {
     alert("💾 已儲存「" + currentProject + "」到本機與雲端！");
   }
 
-  // 五大資料庫 State
-  const [materialDB, setMaterialDB] = React.useState([]);
-  const [purchaseDB, setPurchaseDB] = React.useState([]);
-  const [fabricationDB, setFabricationDB] = React.useState([]);
-  const [transportDB, setTransportDB] = React.useState([]);
-  const [installDB, setInstallDB] = React.useState([]);
 
 // --- ☁️ 雲端讀取 (修正重量歸零版) ---
 async function loadProjectsFromCloud() {
