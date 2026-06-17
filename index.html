@@ -2482,8 +2482,14 @@ function App() {
   const [storageUsage, setStorageUsage] = React.useState(0);
 
   
-  // 🚀 確保在網頁開啟時，自動執行一次讀取
- // 🚀 手動存檔
+  // 五大資料庫 State
+  const [materialDB, setMaterialDB] = React.useState([]);
+  const [purchaseDB, setPurchaseDB] = React.useState([]);
+  const [fabricationDB, setFabricationDB] = React.useState([]);
+  const [transportDB, setTransportDB] = React.useState([]);
+  const [installDB, setInstallDB] = React.useState([]);
+
+  // 🚀 手動存檔
   function handleManualSave() {
     const proj = projects[currentProject];
     if (!currentProject || !proj) {
@@ -2494,13 +2500,6 @@ function App() {
     saveToCloud(currentProject, proj);
     alert("💾 已儲存「" + currentProject + "」到本機與雲端！");
   }
-    // 原有的資料庫載入邏輯...
-    loadDB("material", CSV_URLS.material, setMaterialDB);
-    // ...
-    
-    // 執行雲端載入
-    loadProjectsFromCloud();
-  }, []);
 
   // 五大資料庫 State
   const [materialDB, setMaterialDB] = React.useState([]);
