@@ -238,7 +238,7 @@ function loadProjects() {
  ****************************************************/
 
 // 多工程管理
-function ProjectManager({ currentProject, setCurrentProject, projects, setProjects, deleteFromCloud }) {
+function ProjectManager({ currentProject, setCurrentProject, projects, setProjects, deleteFromCloud, onManualSave, isSyncing }) {
   // 新增工程
   function addProject() {
     const name = prompt("請輸入工程名稱：");
@@ -262,8 +262,29 @@ function ProjectManager({ currentProject, setCurrentProject, projects, setProjec
     saveProjects(updated);
   }
 
-  // 🚀 修改：刪除工程（含雲端同步）
-  async function deleteProject(name) {
+// 🚀 複製工程
+  function duplicateProject() {
+    if (!currentProject) { alert("請先選擇要複製的工程"); return; }
+    const defaultName = currentProject + "-副本";
+    const name = prompt("請輸入複製後的工程名稱：", defaultName);
+    if (!name) return;
+    if (projects[name]) { alert("工程名稱已存在！"); return; }
+
+    const source = projects[currentProject];
+    const cloned = {
+      allItems: JSON.parse(JSON.stringify(source.allItems || [])),
+      manualAdjustDetail: JSON.parse(JSON.stringify(source.manualAdjustDetail || {})),
+      adminRate: source.adminRate ?? 15,
+      profitRate: source.profitRate ?? 35,
+      floorPrice: source.floorPrice ?? 0
+    };
+
+    const updated = { ...projects, [name]: cloned };
+    setProjects(updated);
+    setCurrentProject(name);
+    saveProjects(updated);
+    alert(`✅ 已複製「${currentProject}」→「${name}」，請記得點「立即存檔」同步到雲端！`);
+  }
   if (!window.confirm(`確定刪除工程「${name}」？此操作無法復原！`)) return;
 
   // 1. 先刪本地（畫面立即反應）
@@ -286,9 +307,20 @@ function ProjectManager({ currentProject, setCurrentProject, projects, setProjec
   }
 }
 
-  return (
+ return (
     <div className="bg-white p-4 rounded shadow mb-4 print-hidden">
-      <h2 className="text-lg font-bold mb-3">工程管理</h2>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-lg font-bold">工程管理</h2>
+        {/* 🚀 手動存檔按鈕 */}
+        <button
+          onClick={onManualSave}
+          disabled={isSyncing}
+          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg font-bold text-sm shadow transition-all"
+        >
+          <span>{isSyncing ? "⏳" : "💾"}</span>
+          <span>{isSyncing ? "儲存中..." : "立即存檔"}</span>
+        </button>
+      </div>
 
       <div className="flex flex-wrap gap-2">
         {Object.keys(projects).map(key => (
@@ -313,13 +345,22 @@ function ProjectManager({ currentProject, setCurrentProject, projects, setProjec
           ＋ 新增工程
         </button>
 
-        {currentProject && (
-          <button
-            onClick={() => deleteProject(currentProject)}
-            className="px-3 py-1 rounded bg-red-600 text-white"
-          >
-            刪除目前工程
-          </button>
+     {currentProject && (
+          <>
+            <button
+              onClick={duplicateProject}
+              className="px-3 py-1 rounded bg-amber-500 hover:bg-amber-600 text-white font-bold"
+              title="複製目前工程的所有成本資料到新工程"
+            >
+              📋 複製工程
+            </button>
+            <button
+              onClick={() => deleteProject(currentProject)}
+              className="px-3 py-1 rounded bg-red-600 text-white"
+            >
+              刪除目前工程
+            </button>
+          </>
         )}
       </div>
     </div>
@@ -2440,7 +2481,17 @@ function App() {
 
   
   // 🚀 確保在網頁開啟時，自動執行一次讀取
-  React.useEffect(() => {
+ // 🚀 手動存檔
+  function handleManualSave() {
+    const proj = projects[currentProject];
+    if (!currentProject || !proj) {
+      alert("請先選擇工程");
+      return;
+    }
+    saveProjects(projects);
+    saveToCloud(currentProject, proj);
+    alert("💾 已儲存「" + currentProject + "」到本機與雲端！");
+  }
     // 原有的資料庫載入邏輯...
     loadDB("material", CSV_URLS.material, setMaterialDB);
     // ...
@@ -2702,12 +2753,14 @@ async function deleteFromCloud(projectName) {
 </div>
    
       <ProjectManager
-  currentProject={currentProject}
-  setCurrentProject={setCurrentProject}
-  projects={projects}
-  setProjects={setProjects}
-  deleteFromCloud={deleteFromCloud}
-/>
+        currentProject={currentProject}
+        setCurrentProject={setCurrentProject}
+        projects={projects}
+        setProjects={setProjects}
+        deleteFromCloud={deleteFromCloud}
+        onManualSave={handleManualSave}
+        isSyncing={isSyncing}
+      />
       <BackupArea projects={projects} setProjects={setProjects} setCurrentProject={setCurrentProject} />
 
       <div className="flex gap-2 mb-4 print-hidden">
