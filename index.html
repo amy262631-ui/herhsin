@@ -285,7 +285,9 @@ function ProjectManager({ currentProject, setCurrentProject, projects, setProjec
     saveProjects(updated);
     alert(`✅ 已複製「${currentProject}」→「${name}」，請記得點「立即存檔」同步到雲端！`);
   }
-  if (!window.confirm(`確定刪除工程「${name}」？此操作無法復原！`)) return;
+
+  async function deleteProject(name) {
+    if (!window.confirm(`確定刪除工程「${name}」？此操作無法復原！`)) return;
 
   // 1. 先刪本地（畫面立即反應）
   const updated = { ...projects };
